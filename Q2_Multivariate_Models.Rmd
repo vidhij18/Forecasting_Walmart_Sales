@@ -1,0 +1,872 @@
+---
+title: "Q2: Multivariate Models"
+output: html_document
+---
+# Multivariate models 
+
+Next we created multivariate VAR models for the different time series data. Data was split into training and testing samples for three different splits, taking 171, 355, 536 days’ latest data for each time series in the test sample, and the rest first portion used for training. For VAR models, horizon of 1 was used for forecasting. File ‘calendar.csv’ was used to account for exogenous variables in each VAR model. 
+
+Process followed in each VAR model:
+
+1. A new variable is created by binding the concerned time series objects into one.
+
+2. Optimum lag ‘p’ (to be used in the VAR(p) model) is found using the VARselect function of the ‘vars’ library with a lag.max value. The most common value given by the different selection criteria was chosen to fit the data.
+
+3. The VAR model was built using the optimum lag found above and using a modified matrix for calendar data to account for exogenous variables.
+
+4. Granger causality tests were carried out for each involved time series. In the cases where obtained p-value is less than 0.05, we can reject the null hypothesis and conclude that the time series granger causes other time series.
+
+5. Next, we made the forecast for each model for horizon of 1 and different confidence intervals (ci). For point forecasts, we use ci=0.95. For probabilistic forecasts, we use different ci values in (0.50, 0.67, 0.95, and 0.99) and use the corresponding quantile values to obtain 9 scaled pinball loss values for each time series which is then averaged and presented in the results table.
+
+
+#### Importing libraries and creating time series objects 
+```{r importing ibraries, results='hide'}
+# The libraries to be used  ##########################################################################################
+
+library(readr)
+library(urca)
+library(vars)
+library(mFilter)
+library(tseries)
+library(forecast)
+library(tidyverse)
+library(ggplot2)
+library(xts)
+
+source("CustomFunctions.R")
+
+```
+
+```{r reading dataset and creating time series}
+# Read the dataset  ########################################################################################
+
+project_data = read.csv("Projectdata.csv")
+calender = read.csv(file = 'calendar.csv',header=TRUE,sep=",")
+
+project_data$date = as.Date(project_data$date, format = "%d/%m/%y")
+
+# Create time series objects ###############################################################################
+# Time series for each variable
+hobbies_ca_1_ts = xts(project_data$Hobbies_CA_1, order.by = project_data$date)
+household_1_ca_1_ts = xts(project_data$Household_1_CA_1, order.by = project_data$date)
+household_2_ca_1_ts = xts(project_data$Household_2_CA_1, order.by = project_data$date)
+foods_1_ca_1_ts = xts(project_data$Foods_1_CA_1, order.by = project_data$date)
+foods_2_ca_1_ts = xts(project_data$Foods_2_CA_1, order.by = project_data$date)
+foods_3_ca_1_ts = xts(project_data$Foods_3_CA_1, order.by = project_data$date)
+
+hobbies_ca_2_ts = xts(project_data$Hobbies_CA_2, order.by = project_data$date)
+household_1_ca_2_ts = xts(project_data$Household_1_CA_2, order.by = project_data$date)
+household_2_ca_2_ts = xts(project_data$Household_2_CA_2, order.by = project_data$date)
+foods_1_ca_2_ts = xts(project_data$Foods_1_CA_2, order.by = project_data$date)
+foods_2_ca_2_ts = xts(project_data$Foods_2_CA_2, order.by = project_data$date)
+foods_3_ca_2_ts = xts(project_data$Foods_3_CA_2, order.by = project_data$date)
+
+hobbies_ca_3_ts = xts(project_data$Hobbies_CA_3, order.by = project_data$date)
+household_1_ca_3_ts = xts(project_data$Household_1_CA_3, order.by = project_data$date)
+household_2_ca_3_ts = xts(project_data$Household_2_CA_3, order.by = project_data$date)
+foods_1_ca_3_ts = xts(project_data$Foods_1_CA_3, order.by = project_data$date)
+foods_2_ca_3_ts = xts(project_data$Foods_2_CA_3, order.by = project_data$date)
+foods_3_ca_3_ts = xts(project_data$Foods_3_CA_3, order.by = project_data$date)
+
+# Time series for aggregated variables at store level
+ca_1_ts = hobbies_ca_1_ts + household_1_ca_1_ts + household_2_ca_1_ts + 
+  foods_1_ca_1_ts + foods_2_ca_1_ts + foods_3_ca_1_ts
+
+ca_2_ts = hobbies_ca_2_ts + household_1_ca_2_ts + household_2_ca_2_ts + 
+  foods_1_ca_2_ts + foods_2_ca_2_ts + foods_3_ca_2_ts
+
+ca_3_ts = hobbies_ca_3_ts + household_1_ca_3_ts + household_2_ca_3_ts + 
+  foods_1_ca_3_ts + foods_2_ca_3_ts + foods_3_ca_3_ts
+
+# Time series for aggregated variables at product type level
+hobbies_ts = hobbies_ca_1_ts + hobbies_ca_2_ts + hobbies_ca_3_ts
+
+households_ts = household_1_ca_1_ts + household_2_ca_1_ts + household_1_ca_2_ts + 
+  household_2_ca_2_ts + household_1_ca_3_ts + household_2_ca_3_ts
+
+foods_ts = foods_1_ca_1_ts + foods_2_ca_1_ts + foods_3_ca_1_ts + 
+  foods_1_ca_2_ts + foods_2_ca_2_ts + foods_3_ca_2_ts + 
+  foods_1_ca_3_ts + foods_2_ca_3_ts + foods_3_ca_3_ts
+
+# Calender File for Exogenous Variables
+calender$IsEvent[calender$event_name_1 == ""] = 0
+calender$IsEvent[calender$event_name_1 != ""] = 1
+
+cal_exog = cbind(snap_CA = calender$snap_CA, isEvent = calender$IsEvent)
+
+```
+
+#### Creating df to store all loss values across splits
+```{r Results df}
+store_loss_df = data.frame(matrix(nrow = 3, ncol = 8, dimnames = list(cbind("ca_1","ca_2","ca_3"), cbind("split_1_rmsse","split_2_rmsse","split_3_rmsse","split_1_spl","split_2_spl","split_3_spl","average_RMSSE","average_SPL"))))
+
+prod_loss_df = data.frame(matrix(nrow = 3, ncol = 8, dimnames = list(cbind("hobbies","households","foods"), cbind("split_1_rmsse","split_2_rmsse","split_3_rmsse","split_1_spl","split_2_spl","split_3_spl","average_RMSSE","average_SPL"))))
+
+complete_loss_df = data.frame(matrix(nrow = 18, ncol = 8, dimnames = list(cbind("hobbies_ca_1","household_1_ca_1","household_2_ca_1","foods_1_ca_1","foods_2_ca_1","foods_3_ca_1","hobbies_ca_2","household_1_ca_2","household_2_ca_2","foods_1_ca_2","foods_2_ca_2","foods_3_ca_2","hobbies_ca_3","household_1_ca_3","household_2_ca_3","foods_1_ca_3","foods_2_ca_3","foods_3_ca_3"), cbind("split_1_rmsse","split_2_rmsse","split_3_rmsse","split_1_spl","split_2_spl","split_3_spl","average_RMSSE","average_SPL"))))
+```
+```{r}
+# store_loss_df$split_1_rmsse=rbind(0,0,2)
+store_loss_df
+```
+
+
+#### Creating training-testing split 
+Now we split our data for training and testing. We use three different splits. Models are trained and forecasts and losses are calculated for each split and stored in the results data-frame each time. This cannot be done in a loop as the step of selecting the optimum lag for VAR model requires manual checking and has not been automated in the following code. We change the value of split_n from 1 to 3 and run the whole code. Note that we also need re-run the code for creating time series objects as they have been manipulated differently for the previous split run.
+
+```{r Train test split}
+# Create training/testing split ######################################################################################
+
+split_n = 3
+
+splits = cbind(171, 355, 536)
+test_days_start = splits[split_n]
+
+test_length = test_days_start
+horizon = 1
+
+cal_exog_train = head(cal_exog, (length(cal_exog[,1])-test_days_start))
+cal_exog_dumvar = head(tail(cal_exog, test_days_start), horizon)
+cal_exog = cal_exog_train
+
+# Splits for all time series
+training_hobbies_ca_1_ts = head(hobbies_ca_1_ts, (length(hobbies_ca_1_ts)-test_days_start))
+testing_hobbies_ca_1_ts = head(tail(hobbies_ca_1_ts, test_days_start), test_length)
+hobbies_ca_1_ts = training_hobbies_ca_1_ts
+
+training_hobbies_ca_2_ts = head(hobbies_ca_2_ts, (length(hobbies_ca_2_ts)-test_days_start))
+testing_hobbies_ca_2_ts = head(tail(hobbies_ca_2_ts, test_days_start), test_length)
+hobbies_ca_2_ts = training_hobbies_ca_2_ts
+
+training_hobbies_ca_3_ts = head(hobbies_ca_3_ts, (length(hobbies_ca_3_ts)-test_days_start))
+testing_hobbies_ca_3_ts = head(tail(hobbies_ca_3_ts, test_days_start), test_length)
+hobbies_ca_3_ts = training_hobbies_ca_3_ts
+
+training_household_1_ca_1_ts = head(household_1_ca_1_ts, (length(household_1_ca_1_ts)-test_days_start))
+testing_household_1_ca_1_ts = head(tail(household_1_ca_1_ts, test_days_start), test_length)
+household_1_ca_1_ts = training_household_1_ca_1_ts
+
+training_household_2_ca_1_ts = head(household_2_ca_1_ts, (length(household_2_ca_1_ts)-test_days_start))
+testing_household_2_ca_1_ts = head(tail(household_2_ca_1_ts, test_days_start), test_length)
+household_2_ca_1_ts = training_household_2_ca_1_ts
+
+training_household_1_ca_2_ts = head(household_1_ca_2_ts, (length(household_1_ca_2_ts)-test_days_start))
+testing_household_1_ca_2_ts = head(tail(household_1_ca_2_ts, test_days_start), test_length)
+household_1_ca_2_ts = training_household_1_ca_2_ts
+
+training_household_2_ca_2_ts = head(household_2_ca_2_ts, (length(household_2_ca_2_ts)-test_days_start))
+testing_household_2_ca_2_ts = head(tail(household_2_ca_2_ts, test_days_start), test_length)
+household_2_ca_2_ts = training_household_2_ca_2_ts
+
+training_household_1_ca_3_ts = head(household_1_ca_3_ts, (length(household_1_ca_3_ts)-test_days_start))
+testing_household_1_ca_3_ts = head(tail(household_1_ca_3_ts, test_days_start), test_length)
+household_1_ca_3_ts = training_household_1_ca_3_ts
+
+training_household_2_ca_3_ts = head(household_2_ca_3_ts, (length(household_2_ca_3_ts)-test_days_start))
+testing_household_2_ca_3_ts = head(tail(household_2_ca_3_ts, test_days_start), test_length)
+household_2_ca_3_ts = training_household_2_ca_3_ts
+
+training_foods_1_ca_1_ts = head(foods_1_ca_1_ts, (length(foods_1_ca_1_ts)-test_days_start))
+testing_foods_1_ca_1_ts = head(tail(foods_1_ca_1_ts, test_days_start), test_length)
+foods_1_ca_1_ts = training_foods_1_ca_1_ts
+
+training_foods_2_ca_1_ts = head(foods_2_ca_1_ts, (length(foods_2_ca_1_ts)-test_days_start))
+testing_foods_2_ca_1_ts = head(tail(foods_2_ca_1_ts, test_days_start), test_length)
+foods_2_ca_1_ts = training_foods_2_ca_1_ts
+
+training_foods_3_ca_1_ts = head(foods_3_ca_1_ts, (length(foods_3_ca_1_ts)-test_days_start))
+testing_foods_3_ca_1_ts = head(tail(foods_3_ca_1_ts, test_days_start), test_length)
+foods_3_ca_1_ts = training_foods_3_ca_1_ts
+
+training_foods_1_ca_2_ts = head(foods_1_ca_2_ts, (length(foods_1_ca_2_ts)-test_days_start))
+testing_foods_1_ca_2_ts = head(tail(foods_1_ca_2_ts, test_days_start), test_length)
+foods_1_ca_2_ts = training_foods_1_ca_2_ts
+
+training_foods_2_ca_2_ts = head(foods_2_ca_2_ts, (length(foods_2_ca_2_ts)-test_days_start))
+testing_foods_2_ca_2_ts = head(tail(foods_2_ca_2_ts, test_days_start), test_length)
+foods_2_ca_2_ts = training_foods_2_ca_2_ts
+
+training_foods_3_ca_2_ts = head(foods_3_ca_2_ts, (length(foods_3_ca_2_ts)-test_days_start))
+testing_foods_3_ca_2_ts = head(tail(foods_3_ca_2_ts, test_days_start), test_length)
+foods_3_ca_2_ts = training_foods_3_ca_2_ts
+
+training_foods_1_ca_3_ts = head(foods_1_ca_3_ts, (length(foods_1_ca_3_ts)-test_days_start))
+testing_foods_1_ca_3_ts = head(tail(foods_1_ca_3_ts, test_days_start), test_length)
+foods_1_ca_3_ts = training_foods_1_ca_3_ts
+
+training_foods_2_ca_3_ts = head(foods_2_ca_3_ts, (length(foods_2_ca_3_ts)-test_days_start))
+testing_foods_2_ca_3_ts = head(tail(foods_2_ca_3_ts, test_days_start), test_length)
+foods_2_ca_3_ts = training_foods_2_ca_3_ts
+
+training_foods_3_ca_3_ts = head(foods_3_ca_3_ts, (length(foods_3_ca_3_ts)-test_days_start))
+testing_foods_3_ca_3_ts = head(tail(foods_3_ca_3_ts, test_days_start), test_length)
+foods_3_ca_3_ts = training_foods_3_ca_3_ts
+
+
+# Splits for aggregated time series
+training_ca_1_ts = head(ca_1_ts, (length(ca_1_ts)-test_days_start))
+testing_ca_1_ts = head(tail(ca_1_ts, test_days_start), test_length)
+ca_1_ts = training_ca_1_ts
+
+training_ca_2_ts = head(ca_2_ts, (length(ca_2_ts)-test_days_start))
+testing_ca_2_ts = head(tail(ca_2_ts, test_days_start), test_length)
+ca_2_ts = training_ca_2_ts
+
+training_ca_3_ts = head(ca_3_ts, (length(ca_3_ts)-test_days_start))
+testing_ca_3_ts = head(tail(ca_3_ts, test_days_start), test_length)
+ca_3_ts = training_ca_3_ts
+
+
+
+training_hobbies_ts = head(hobbies_ts, (length(hobbies_ts)-test_days_start))
+testing_hobbies_ts = head(tail(hobbies_ts, test_days_start), test_length)
+hobbies_ts = training_hobbies_ts
+
+training_households_ts = head(households_ts, (length(households_ts)-test_days_start))
+testing_households_ts = head(tail(households_ts, test_days_start), test_length)
+households_ts = training_households_ts
+
+training_foods_ts = head(foods_ts, (length(foods_ts)-test_days_start))
+testing_foods_ts = head(tail(foods_ts, test_days_start), test_length)
+foods_ts = training_foods_ts
+```
+
+
+
+## VAR model for each store 
+
+For this model, three time series were considered, one for each store CA_1, CA_2, CA_3. Each time series was created by aggregating six time series (1 hobbies, 2 households, 3 foods) for that store. 
+
+```{r Plot store level data}
+# Plotting the time series for aggregated data
+autoplot(cbind(ca_1_ts, ca_2_ts, ca_3_ts))
+```
+
+#### Find optimum lag to be used for creating the VAR model
+```{r Optimum lag store level}
+# Find optimum lag before running the VAR models ####################################################################
+store_agg_data.bv = cbind(ca_1_ts,ca_2_ts,ca_3_ts)
+lagselect = VARselect(store_agg_data.bv, lag.max = 100, type="both", exogen = cal_exog)
+lagselect$selection
+```
+#### Building VAR model for store level aggregated data 
+
+```{r Build store level VAR model}
+# Building VAR model for store level aggregated data  ##############################################################
+store_var = VAR(store_agg_data.bv, p = 31, type = "both", exogen = cal_exog)
+summary(store_var)
+```
+
+#### Granger Causality test:
+```{r Granger causality for store level VAR}
+# Granger causality
+store_var_granger_ca_1 = causality(store_var, cause = "ca_1_ts")
+store_var_granger_ca_1
+
+store_var_granger_ca_2 = causality(store_var, cause = "ca_2_ts")
+store_var_granger_ca_2
+
+store_var_granger_ca_3 = causality(store_var, cause = "ca_3_ts")
+store_var_granger_ca_3
+
+```
+Granger tests showed p-value < 0.05 for all three time series indicating that each granger causes the other two.
+
+
+
+#### Making forecasts:
+```{r Forecasting with store level VAR}
+# Forecasting  ###########
+store_var_forecast = predict(store_var, n.ahead = horizon, ci = 0.95, dumvar = cal_exog_dumvar)
+store_var_forecast
+
+```
+
+#### Calculating RMSSE values
+```{r calculating RMSSE values}
+
+# Finding RMSSE for comparison  ############################################################################
+
+store_var_rmsse=cbind(ca_1=0, ca_2=0, ca_3=0)
+
+store_var_ca_1_preds = store_var_forecast$fcst$ca_1_ts[1:horizon]
+store_var_rmsse[1] = rmsse(as.numeric(testing_ca_1_ts), store_var_ca_1_preds, as.numeric(ca_1_ts))
+
+store_var_ca_2_preds = store_var_forecast$fcst$ca_2_ts[1:horizon]
+store_var_rmsse[2] = rmsse(as.numeric(testing_ca_2_ts), store_var_ca_2_preds, as.numeric(ca_2_ts))
+
+store_var_ca_3_preds = store_var_forecast$fcst$ca_3_ts[1:horizon]
+store_var_rmsse[3] = rmsse(as.numeric(testing_ca_3_ts), store_var_ca_3_preds, as.numeric(ca_3_ts))
+
+print("RMSSE values:", quote=FALSE)
+store_var_rmsse
+
+```
+
+```{r saving store level RMSSE}
+store_loss_df[, split_n]=store_var_rmsse[1,]
+```
+
+
+#### Finding average SPL for probabilistic forecasts
+```{r store level probabilistic forecasts}
+# Probabilistic forecasts
+cis=cbind(0.99, 0.95, 0.67, 0.5)
+total_pl=cbind(ca_1=0,ca_2=0,ca_3=0)
+
+# median case
+new_forecast = predict(store_var, n.ahead = horizon, ci = 0.95, dumvar = cal_exog_dumvar)
+
+median_preds_ca_1 = new_forecast$fcst$ca_1_ts[1:horizon]
+median_preds_ca_2 = new_forecast$fcst$ca_2_ts[1:horizon]
+median_preds_ca_3 = new_forecast$fcst$ca_3_ts[1:horizon]
+
+total_pl[1] = total_pl[1] + pinball_loss(0.5,as.numeric(ca_1_ts),as.numeric(testing_ca_1_ts[1:horizon]),median_preds_ca_1,horizon)
+total_pl[2] = total_pl[2] + pinball_loss(0.5,as.numeric(ca_2_ts),as.numeric(testing_ca_2_ts[1:horizon]),median_preds_ca_2,horizon)
+total_pl[3] = total_pl[3] + pinball_loss(0.5,as.numeric(ca_3_ts),as.numeric(testing_ca_3_ts[1:horizon]),median_preds_ca_3,horizon)
+
+for (i in 1:length(cis)){
+
+  tau = (1-cis[i])/2
+  
+  new_forecast = predict(store_var, n.ahead = horizon, ci = cis[i], dumvar = cal_exog_dumvar)
+  new_forecast$fcst$ca_1_ts[2:2]
+  lower_preds_ca_1 = new_forecast$fcst$ca_1_ts[(horizon+1):(2*horizon)]
+  upper_preds_ca_1 = new_forecast$fcst$ca_1_ts[(2*horizon+1):(3*horizon)]
+  total_pl[1] = total_pl[1] + pinball_loss(tau,as.numeric(ca_1_ts),as.numeric(testing_ca_1_ts[1:horizon]),lower_preds_ca_1,horizon)
+  total_pl[1] = total_pl[1] + pinball_loss(1-tau,as.numeric(ca_1_ts),as.numeric(testing_ca_1_ts[1:horizon]),upper_preds_ca_1,horizon)
+  
+  lower_preds_ca_2 = new_forecast$fcst$ca_2_ts[(horizon+1):(2*horizon)]
+  upper_preds_ca_2 = new_forecast$fcst$ca_2_ts[(2*horizon+1):(3*horizon)]
+  total_pl[2] = total_pl[2] + pinball_loss(tau,as.numeric(ca_2_ts),as.numeric(testing_ca_2_ts[1:horizon]),lower_preds_ca_2,horizon)
+  total_pl[2] = total_pl[2] + pinball_loss(1-tau,as.numeric(ca_2_ts),as.numeric(testing_ca_2_ts[1:horizon]),upper_preds_ca_2,horizon)
+  
+  lower_preds_ca_3 = new_forecast$fcst$ca_3_ts[(horizon+1):(2*horizon)]
+  upper_preds_ca_3 = new_forecast$fcst$ca_3_ts[(2*horizon+1):(3*horizon)]
+  total_pl[3] = total_pl[3] + pinball_loss(tau,as.numeric(ca_3_ts),as.numeric(testing_ca_3_ts[1:horizon]),lower_preds_ca_3,horizon)
+  total_pl[3] = total_pl[3] + pinball_loss(1-tau,as.numeric(ca_3_ts),as.numeric(testing_ca_3_ts[1:horizon]),upper_preds_ca_3,horizon)
+  
+}
+total_pl = total_pl/((2*length(cis))+1)
+
+print("Average SPL values:", quote=FALSE)
+print(total_pl)
+```
+
+```{r saving store level SPL values}
+store_loss_df[, split_n+3]=total_pl[1,]
+```
+
+After running for all three splits, we calculate the average and store the results in a file as well.
+```{r save store level loss results in file}
+store_loss_df$average_RMSSE = rowMeans(store_loss_df[,c("split_1_rmsse","split_2_rmsse","split_3_rmsse")])
+store_loss_df$average_SPL = rowMeans(store_loss_df[,c("split_1_spl","split_2_spl","split_3_spl")])
+write.csv(store_loss_df,"Store_level_VAR_losses.csv", row.names = TRUE)
+```
+
+## VAR model for each type of products 
+For this model, three time series were considered, one for each product type category Hobbies, Households, Foods. Each time series was created by aggregating its corresponding time series across the three stores. 
+
+
+```{r plot product level data}
+# Plotting the time series for aggregated data
+autoplot(cbind(hobbies_ts,households_ts,foods_ts))
+```
+
+
+#### Find optimum lag to be used for creating the VAR model
+```{r find optimum lag for prod level VAR model}
+# Find optimum lag before running the VAR models ###################################################################
+prod_agg_data.bv = cbind(hobbies_ts,households_ts,foods_ts)
+
+lagselect = VARselect(prod_agg_data.bv, lag.max = 100, type="both")
+lagselect$selection
+```
+
+#### Building VAR model for product type level aggregated data 
+```{r building prod level VAR model}
+# Building VAR model for product level aggregated data  ############################################################
+prod_var = VAR(prod_agg_data.bv, p = 29, type = "both", exogen = cal_exog)
+summary(prod_var)
+```
+
+#### Granger Causality test
+```{r Granger causality test for prod level VAR}
+# Granger causality
+prod_var_granger_hobbies = causality(prod_var, cause = "hobbies_ts")
+prod_var_granger_hobbies
+
+prod_var_granger_households = causality(prod_var, cause = "households_ts")
+prod_var_granger_households
+
+prod_var_granger_foods = causality(prod_var, cause = "foods_ts")
+prod_var_granger_foods
+```
+
+For this test split, according to the test result, we cannot reject the null hypothesis that hobbies_ts does not Granger-cause households_ts and foods_ts. But for the other two, we can reject the null hypothesis to conclude that they each Granger-cause the other two.
+
+
+#### Making forecasts
+```{r forecasting for prod level VAR}
+# Forecasting #################
+prod_var_forecast = predict(prod_var, n.ahead = horizon, ci = 0.95, dumvar = cal_exog_dumvar)
+prod_var_forecast
+```
+
+
+#### Calculating RMSSE values
+```{r calculate RMSSE for prod level VAR}
+# Finding RMSSE for comparison  ############################################################################
+
+prod_var_rmsse = cbind(hobbies_ts=0, households_ts=0, foods_ts=0)
+
+prod_var_hobbies_preds = prod_var_forecast$fcst$hobbies_ts[1:horizon]
+prod_var_rmsse[1] = rmsse(as.numeric(testing_hobbies_ts), prod_var_hobbies_preds, as.numeric(hobbies_ts))
+
+prod_var_households_preds = prod_var_forecast$fcst$households_ts[1:horizon]
+prod_var_rmsse[2] = rmsse(as.numeric(testing_households_ts), prod_var_households_preds, as.numeric(households_ts))
+
+prod_var_foods_preds = prod_var_forecast$fcst$foods_ts[1:horizon]
+prod_var_rmsse[3] = rmsse(as.numeric(testing_foods_ts), prod_var_foods_preds, as.numeric(foods_ts))
+
+print("RMSSE values:", quote=FALSE)
+prod_var_rmsse
+
+```
+
+```{r saving prod level RMSSE values}
+prod_loss_df[, split_n] = prod_var_rmsse[1,]
+```
+
+
+
+#### Finding average SPL for probabilistic forecasts
+```{r calculating SPL for probabilistic forecasts}
+
+# Probabilistic forecasts
+
+cis=cbind(0.99, 0.95, 0.67, 0.5)
+total_pl=cbind(hobbies=0,households=0,foods=0)
+
+# median case
+new_forecast = predict(prod_var, n.ahead = horizon, ci = 0.95, dumvar = cal_exog_dumvar)
+
+median_preds_hobbies = new_forecast$fcst$hobbies_ts[1:horizon]
+median_preds_households = new_forecast$fcst$households_ts[1:horizon]
+median_preds_foods = new_forecast$fcst$foods_ts[1:horizon]
+
+total_pl[1] = total_pl[1] + pinball_loss(0.5,as.numeric(hobbies_ts),as.numeric(testing_hobbies_ts[1:horizon]),median_preds_hobbies,horizon)
+total_pl[2] = total_pl[2] + pinball_loss(0.5,as.numeric(households_ts),as.numeric(testing_households_ts[1:horizon]),median_preds_households,horizon)
+total_pl[3] = total_pl[3] + pinball_loss(0.5,as.numeric(foods_ts),as.numeric(testing_foods_ts[1:horizon]),median_preds_foods,horizon)
+
+for (i in 1:length(cis)){
+  
+  tau = (1-cis[i])/2
+  
+  new_forecast = predict(prod_var, n.ahead = horizon, ci = cis[i], dumvar = cal_exog_dumvar)
+  new_forecast$fcst$hobbies_ts[2:2]
+  lower_preds_hobbies = new_forecast$fcst$hobbies_ts[(horizon+1):(2*horizon)]
+  upper_preds_hobbies = new_forecast$fcst$hobbies_ts[(2*horizon+1):(3*horizon)]
+  total_pl[1] = total_pl[1] + pinball_loss(tau,as.numeric(hobbies_ts),as.numeric(testing_hobbies_ts[1:horizon]),lower_preds_hobbies,horizon)
+  total_pl[1] = total_pl[1] + pinball_loss(1-tau,as.numeric(hobbies_ts),as.numeric(testing_hobbies_ts[1:horizon]),upper_preds_hobbies,horizon)
+  
+  lower_preds_households = new_forecast$fcst$households_ts[(horizon+1):(2*horizon)]
+  upper_preds_households = new_forecast$fcst$households_ts[(2*horizon+1):(3*horizon)]
+  total_pl[2] = total_pl[2] + pinball_loss(tau,as.numeric(households_ts),as.numeric(testing_households_ts[1:horizon]),lower_preds_households,horizon)
+  total_pl[2] = total_pl[2] + pinball_loss(1-tau,as.numeric(households_ts),as.numeric(testing_households_ts[1:horizon]),upper_preds_households,horizon)
+  
+  lower_preds_foods = new_forecast$fcst$foods_ts[(horizon+1):(2*horizon)]
+  upper_preds_foods = new_forecast$fcst$foods_ts[(2*horizon+1):(3*horizon)]
+  total_pl[3] = total_pl[3] + pinball_loss(tau,as.numeric(foods_ts),as.numeric(testing_foods_ts[1:horizon]),lower_preds_foods,horizon)
+  total_pl[3] = total_pl[3] + pinball_loss(1-tau,as.numeric(foods_ts),as.numeric(testing_foods_ts[1:horizon]),upper_preds_foods,horizon)
+  
+}
+total_pl = total_pl/((2*length(cis))+1)
+
+print("Average SPL values:", quote=FALSE)
+print(total_pl)
+
+```
+
+```{r saving average SPL values for prod level VAR}
+prod_loss_df[,split_n+3] = total_pl[1,]
+```
+
+Once model has been run for all 3 splits, we calculate average values and store results in a file
+```{r save prod level loss results in file}
+prod_loss_df$average_RMSSE = rowMeans(prod_loss_df[,c("split_1_rmsse","split_2_rmsse","split_3_rmsse")])
+prod_loss_df$average_SPL = rowMeans(prod_loss_df[,c("split_1_spl","split_2_spl","split_3_spl")])
+write.csv(prod_loss_df,"Prod_level_VAR_losses.csv", row.names=TRUE)
+```
+
+
+
+## Large VAR model with all variables  
+In this model, we considered a large VAR model including all 18 time series together.
+
+
+#### Find optimum lag to be used for creating the VAR model
+```{r find optimum lag for large VAR model}
+# Find optimum lag before running the Large VAR model ###############################################################
+
+complete_data.bv = cbind(hobbies_ca_1_ts, hobbies_ca_2_ts, hobbies_ca_3_ts, 
+                         household_1_ca_1_ts, household_2_ca_1_ts, household_1_ca_2_ts, 
+                         household_2_ca_2_ts, household_1_ca_3_ts, household_2_ca_3_ts, 
+                         foods_1_ca_1_ts, foods_2_ca_1_ts, foods_3_ca_1_ts, 
+                         foods_1_ca_2_ts, foods_2_ca_2_ts, foods_3_ca_2_ts, 
+                         foods_1_ca_3_ts, foods_2_ca_3_ts, foods_3_ca_3_ts)
+
+lagselect = VARselect(complete_data.bv, lag.max = 30, type="both")
+lagselect$selection
+```
+
+#### Building VAR model for complete data 
+```{r build large VAR model}
+# Building VAR model for Large VAR model  #########################################################################
+complete_var = VAR(complete_data.bv, p = 7, type = "both", exogen = cal_exog)
+summary(complete_var)
+```
+
+#### Granger Causality test
+```{r Granger causality test for large VAR model}
+# Granger causality
+complete_var_granger_hobbies_ca_1 = causality(complete_var, cause = "hobbies_ca_1_ts")
+complete_var_granger_hobbies_ca_1
+
+complete_var_granger_hobbies_ca_2 = causality(complete_var, cause = "hobbies_ca_2_ts")
+complete_var_granger_hobbies_ca_2
+
+complete_var_granger_hobbies_ca_3 = causality(complete_var, cause = "hobbies_ca_3_ts")
+complete_var_granger_hobbies_ca_3
+
+complete_var_granger_household_1_ca_1 = causality(complete_var, cause = "household_1_ca_1_ts")
+complete_var_granger_household_1_ca_1
+
+complete_var_granger_household_2_ca_1 = causality(complete_var, cause = "household_2_ca_1_ts")
+complete_var_granger_household_2_ca_1
+
+complete_var_granger_household_1_ca_2 = causality(complete_var, cause = "household_1_ca_2_ts")
+complete_var_granger_household_1_ca_2
+
+complete_var_granger_household_2_ca_2 = causality(complete_var, cause = "household_2_ca_2_ts")
+complete_var_granger_household_2_ca_2
+
+complete_var_granger_household_1_ca_3 = causality(complete_var, cause = "household_1_ca_3_ts")
+complete_var_granger_household_1_ca_3
+
+complete_var_granger_household_2_ca_3 = causality(complete_var, cause = "household_2_ca_3_ts")
+complete_var_granger_household_2_ca_3
+
+complete_var_granger_foods_1_ca_1 = causality(complete_var, cause = "foods_1_ca_1_ts")
+complete_var_granger_foods_1_ca_1
+
+complete_var_granger_foods_2_ca_1 = causality(complete_var, cause = "foods_2_ca_1_ts")
+complete_var_granger_foods_2_ca_1
+
+complete_var_granger_foods_3_ca_1 = causality(complete_var, cause = "foods_3_ca_1_ts")
+complete_var_granger_foods_3_ca_1
+
+complete_var_granger_foods_1_ca_2 = causality(complete_var, cause = "foods_1_ca_2_ts")
+complete_var_granger_foods_1_ca_2
+
+complete_var_granger_foods_2_ca_2 = causality(complete_var, cause = "foods_2_ca_2_ts")
+complete_var_granger_foods_2_ca_2
+
+complete_var_granger_foods_3_ca_2 = causality(complete_var, cause = "foods_3_ca_2_ts")
+complete_var_granger_foods_3_ca_2
+
+complete_var_granger_foods_1_ca_3 = causality(complete_var, cause = "foods_1_ca_3_ts")
+complete_var_granger_foods_1_ca_3
+
+complete_var_granger_foods_2_ca_3 = causality(complete_var, cause = "foods_2_ca_3_ts")
+complete_var_granger_foods_2_ca_3
+
+complete_var_granger_foods_3_ca_3 = causality(complete_var, cause = "foods_3_ca_3_ts")
+complete_var_granger_foods_3_ca_3
+
+```
+
+Granger test results provided p-values less than 0.05 for most cases except for household_2_ca_3 and foods_2_ca_1. Only for these two, we fail to reject the null. For the others, we can say that they granger cause the other time series.
+
+
+#### Making forecasts
+```{r forecasting using large VAR model}
+# Forecasting ##################
+complete_var_forecast = predict(complete_var, n.ahead = horizon, ci = 0.95, dumvar = cal_exog_dumvar)
+complete_var_forecast
+```
+
+#### Calculating RMSSE values
+```{r calculate RMSSE for large VAR model}
+# Finding RMSSE for comparison  ############################################################################
+
+complete_rmsse=cbind(hobbies_ca_1=0, household_1_ca_1=0, household_2_ca_1=0,
+               foods_1_ca_1=0, foods_2_ca_1=0, foods_3_ca_1=0,
+               hobbies_ca_2=0, household_1_ca_2=0, household_2_ca_2=0,
+               foods_1_ca_2=0, foods_2_ca_2=0, foods_3_ca_2=0,
+               hobbies_ca_3=0, household_1_ca_3=0, household_2_ca_3=0,
+               foods_1_ca_3=0, foods_2_ca_3=0, foods_3_ca_3=0)
+
+complete_var_hobbies_ca_1_preds = complete_var_forecast$fcst$hobbies_ca_1_ts[1:horizon]
+complete_rmsse[1] = rmsse(as.numeric(testing_hobbies_ca_1_ts), complete_var_hobbies_ca_1_preds, as.numeric(hobbies_ca_1_ts))
+
+complete_var_household_1_ca_1_preds = complete_var_forecast$fcst$household_1_ca_1_ts[1:horizon]
+complete_rmsse[2] = rmsse(as.numeric(testing_household_1_ca_1_ts), complete_var_household_1_ca_1_preds, as.numeric(household_1_ca_1_ts))
+
+
+complete_var_household_2_ca_1_preds = complete_var_forecast$fcst$household_2_ca_1_ts[1:horizon]
+complete_rmsse[3] = rmsse(as.numeric(testing_household_2_ca_1_ts), complete_var_household_2_ca_1_preds, as.numeric(household_2_ca_1_ts))
+
+
+complete_var_foods_1_ca_1_preds = complete_var_forecast$fcst$foods_1_ca_1_ts[1:horizon]
+complete_rmsse[4] = rmsse(as.numeric(testing_foods_1_ca_1_ts), complete_var_foods_1_ca_1_preds, as.numeric(foods_1_ca_1_ts))
+
+
+complete_var_foods_2_ca_1_preds = complete_var_forecast$fcst$foods_2_ca_1_ts[1:horizon]
+complete_rmsse[5] = rmsse(as.numeric(testing_foods_2_ca_1_ts), complete_var_foods_2_ca_1_preds, as.numeric(foods_2_ca_1_ts))
+
+
+complete_var_foods_3_ca_1_preds = complete_var_forecast$fcst$foods_3_ca_1_ts[1:horizon]
+complete_rmsse[6] = rmsse(as.numeric(testing_foods_3_ca_1_ts), complete_var_foods_3_ca_1_preds, as.numeric(foods_3_ca_1_ts))
+
+
+
+
+
+complete_var_hobbies_ca_2_preds = complete_var_forecast$fcst$hobbies_ca_2_ts[1:horizon]
+complete_rmsse[7] = rmsse(as.numeric(testing_hobbies_ca_2_ts), complete_var_hobbies_ca_2_preds, as.numeric(hobbies_ca_2_ts))
+
+
+complete_var_household_1_ca_2_preds = complete_var_forecast$fcst$household_1_ca_2_ts[1:horizon]
+complete_rmsse[8] = rmsse(as.numeric(testing_household_1_ca_2_ts), complete_var_household_1_ca_2_preds, as.numeric(household_1_ca_2_ts))
+
+
+complete_var_household_2_ca_2_preds = complete_var_forecast$fcst$household_2_ca_2_ts[1:horizon]
+complete_rmsse[9] = rmsse(as.numeric(testing_household_2_ca_2_ts), complete_var_household_2_ca_2_preds, as.numeric(household_2_ca_2_ts))
+
+
+complete_var_foods_1_ca_2_preds = complete_var_forecast$fcst$foods_1_ca_2_ts[1:horizon]
+complete_rmsse[10] = rmsse(as.numeric(testing_foods_1_ca_2_ts), complete_var_foods_1_ca_2_preds, as.numeric(foods_1_ca_2_ts))
+
+
+complete_var_foods_2_ca_2_preds = complete_var_forecast$fcst$foods_2_ca_2_ts[1:horizon]
+complete_rmsse[11] = rmsse(as.numeric(testing_foods_2_ca_2_ts), complete_var_foods_2_ca_2_preds, as.numeric(foods_2_ca_2_ts))
+
+
+complete_var_foods_3_ca_2_preds = complete_var_forecast$fcst$foods_3_ca_2_ts[1:horizon]
+complete_rmsse[12] = rmsse(as.numeric(testing_foods_3_ca_2_ts), complete_var_foods_3_ca_2_preds, as.numeric(foods_3_ca_2_ts))
+
+
+
+
+
+complete_var_hobbies_ca_3_preds = complete_var_forecast$fcst$hobbies_ca_3_ts[1:horizon]
+complete_rmsse[13] = rmsse(as.numeric(testing_hobbies_ca_3_ts), complete_var_hobbies_ca_3_preds, as.numeric(hobbies_ca_3_ts))
+
+
+complete_var_household_1_ca_3_preds = complete_var_forecast$fcst$household_1_ca_3_ts[1:horizon]
+complete_rmsse[14] = rmsse(as.numeric(testing_household_1_ca_3_ts), complete_var_household_1_ca_3_preds, as.numeric(household_1_ca_3_ts))
+
+
+complete_var_household_2_ca_3_preds = complete_var_forecast$fcst$household_2_ca_3_ts[1:horizon]
+complete_rmsse[15] = rmsse(as.numeric(testing_household_2_ca_3_ts), complete_var_household_2_ca_3_preds, as.numeric(household_2_ca_3_ts))
+
+
+complete_var_foods_1_ca_3_preds = complete_var_forecast$fcst$foods_1_ca_3_ts[1:horizon]
+complete_rmsse[16] = rmsse(as.numeric(testing_foods_1_ca_3_ts), complete_var_foods_1_ca_3_preds, as.numeric(foods_1_ca_3_ts))
+
+
+complete_var_foods_2_ca_3_preds = complete_var_forecast$fcst$foods_2_ca_3_ts[1:horizon]
+complete_rmsse[17] = rmsse(as.numeric(testing_foods_2_ca_3_ts), complete_var_foods_2_ca_3_preds, as.numeric(foods_2_ca_3_ts))
+
+
+complete_var_foods_3_ca_3_preds = complete_var_forecast$fcst$foods_3_ca_3_ts[1:horizon]
+complete_rmsse[18] = rmsse(as.numeric(testing_foods_3_ca_3_ts), complete_var_foods_3_ca_3_preds, as.numeric(foods_3_ca_3_ts))
+
+print("RMSSE values:", quote=FALSE)
+complete_rmsse
+```
+```{r saving RMSSE for large VAR model}
+complete_loss_df[, split_n]=complete_rmsse[1,]
+```
+
+
+
+#### Finding average SPL for probabilistic forecasts
+
+```{r calculate SPL for probabilistic forecasts of large VAR model}
+# Probabilistic forecasts
+
+cis=cbind(0.99, 0.95, 0.67, 0.5)
+total_pl=cbind(hobbies_ca_1=0, household_1_ca_1=0, household_2_ca_1=0,
+               foods_1_ca_1=0, foods_2_ca_1=0, foods_3_ca_1=0,
+               hobbies_ca_2=0, household_1_ca_2=0, household_2_ca_2=0,
+               foods_1_ca_2=0, foods_2_ca_2=0, foods_3_ca_2=0,
+               hobbies_ca_3=0, household_1_ca_3=0, household_2_ca_3=0,
+               foods_1_ca_3=0, foods_2_ca_3=0, foods_3_ca_3=0)
+
+# median case
+new_forecast = predict(complete_var, n.ahead = horizon, ci = 0.95, dumvar = cal_exog_dumvar)
+
+median_preds_hobbies_ca_1 = new_forecast$fcst$hobbies_ca_1_ts[1:horizon]
+median_preds_household_1_ca_1 = new_forecast$fcst$household_1_ca_1_ts[1:horizon]
+median_preds_household_2_ca_1 = new_forecast$fcst$household_2_ca_1_ts[1:horizon]
+median_preds_foods_1_ca_1 = new_forecast$fcst$foods_1_ca_1_ts[1:horizon]
+median_preds_foods_2_ca_1 = new_forecast$fcst$foods_2_ca_1_ts[1:horizon]
+median_preds_foods_3_ca_1 = new_forecast$fcst$foods_3_ca_1_ts[1:horizon]
+
+median_preds_hobbies_ca_2 = new_forecast$fcst$hobbies_ca_2_ts[1:horizon]
+median_preds_household_1_ca_2 = new_forecast$fcst$household_1_ca_2_ts[1:horizon]
+median_preds_household_2_ca_2 = new_forecast$fcst$household_2_ca_2_ts[1:horizon]
+median_preds_foods_1_ca_2 = new_forecast$fcst$foods_1_ca_2_ts[1:horizon]
+median_preds_foods_2_ca_2 = new_forecast$fcst$foods_2_ca_2_ts[1:horizon]
+median_preds_foods_3_ca_2 = new_forecast$fcst$foods_3_ca_2_ts[1:horizon]
+
+median_preds_hobbies_ca_3 = new_forecast$fcst$hobbies_ca_3_ts[1:horizon]
+median_preds_household_1_ca_3 = new_forecast$fcst$household_1_ca_3_ts[1:horizon]
+median_preds_household_2_ca_3 = new_forecast$fcst$household_2_ca_3_ts[1:horizon]
+median_preds_foods_1_ca_3 = new_forecast$fcst$foods_1_ca_3_ts[1:horizon]
+median_preds_foods_2_ca_3 = new_forecast$fcst$foods_2_ca_3_ts[1:horizon]
+median_preds_foods_3_ca_3 = new_forecast$fcst$foods_3_ca_3_ts[1:horizon]
+
+total_pl[1] = total_pl[1] + pinball_loss(0.5,as.numeric(hobbies_ca_1_ts),as.numeric(testing_hobbies_ca_1_ts[1:horizon]),median_preds_hobbies_ca_1,horizon)
+total_pl[2] = total_pl[2] + pinball_loss(0.5,as.numeric(household_1_ca_1_ts),as.numeric(testing_household_1_ca_1_ts[1:horizon]),median_preds_household_1_ca_1,horizon)
+total_pl[3] = total_pl[3] + pinball_loss(0.5,as.numeric(household_2_ca_1_ts),as.numeric(testing_household_2_ca_1_ts[1:horizon]),median_preds_household_2_ca_1,horizon)
+total_pl[4] = total_pl[4] + pinball_loss(0.5,as.numeric(foods_1_ca_1_ts),as.numeric(testing_foods_1_ca_1_ts[1:horizon]),median_preds_foods_1_ca_1,horizon)
+total_pl[5] = total_pl[5] + pinball_loss(0.5,as.numeric(foods_2_ca_1_ts),as.numeric(testing_foods_2_ca_1_ts[1:horizon]),median_preds_foods_2_ca_1,horizon)
+total_pl[6] = total_pl[6] + pinball_loss(0.5,as.numeric(foods_3_ca_1_ts),as.numeric(testing_foods_3_ca_1_ts[1:horizon]),median_preds_foods_3_ca_1,horizon)
+
+total_pl[7] = total_pl[7] + pinball_loss(0.5,as.numeric(hobbies_ca_2_ts),as.numeric(testing_hobbies_ca_2_ts[1:horizon]),median_preds_hobbies_ca_2,horizon)
+total_pl[8] = total_pl[8] + pinball_loss(0.5,as.numeric(household_1_ca_2_ts),as.numeric(testing_household_1_ca_2_ts[1:horizon]),median_preds_household_1_ca_2,horizon)
+total_pl[9] = total_pl[9] + pinball_loss(0.5,as.numeric(household_2_ca_2_ts),as.numeric(testing_household_2_ca_2_ts[1:horizon]),median_preds_household_2_ca_2,horizon)
+total_pl[10] = total_pl[10] + pinball_loss(0.5,as.numeric(foods_1_ca_2_ts),as.numeric(testing_foods_1_ca_2_ts[1:horizon]),median_preds_foods_1_ca_2,horizon)
+total_pl[11] = total_pl[11] + pinball_loss(0.5,as.numeric(foods_2_ca_2_ts),as.numeric(testing_foods_2_ca_2_ts[1:horizon]),median_preds_foods_2_ca_2,horizon)
+total_pl[12] = total_pl[12] + pinball_loss(0.5,as.numeric(foods_3_ca_2_ts),as.numeric(testing_foods_3_ca_2_ts[1:horizon]),median_preds_foods_3_ca_2,horizon)
+
+total_pl[13] = total_pl[13] + pinball_loss(0.5,as.numeric(hobbies_ca_3_ts),as.numeric(testing_hobbies_ca_3_ts[1:horizon]),median_preds_hobbies_ca_3,horizon)
+total_pl[14] = total_pl[14] + pinball_loss(0.5,as.numeric(household_1_ca_3_ts),as.numeric(testing_household_1_ca_3_ts[1:horizon]),median_preds_household_1_ca_3,horizon)
+total_pl[15] = total_pl[15] + pinball_loss(0.5,as.numeric(household_2_ca_3_ts),as.numeric(testing_household_2_ca_3_ts[1:horizon]),median_preds_household_2_ca_3,horizon)
+total_pl[16] = total_pl[16] + pinball_loss(0.5,as.numeric(foods_1_ca_3_ts),as.numeric(testing_foods_1_ca_3_ts[1:horizon]),median_preds_foods_1_ca_3,horizon)
+total_pl[17] = total_pl[17] + pinball_loss(0.5,as.numeric(foods_2_ca_3_ts),as.numeric(testing_foods_2_ca_3_ts[1:horizon]),median_preds_foods_2_ca_3,horizon)
+total_pl[18] = total_pl[18] + pinball_loss(0.5,as.numeric(foods_3_ca_3_ts),as.numeric(testing_foods_3_ca_3_ts[1:horizon]),median_preds_foods_3_ca_3,horizon)
+
+for (i in 1:length(cis)){
+  
+  tau = (1-cis[i])/2
+  
+  new_forecast = predict(complete_var, n.ahead = horizon, ci = cis[i], dumvar = cal_exog_dumvar)
+  
+  lower_preds_hobbies_ca_1_ts = new_forecast$fcst$hobbies_ca_1_ts[(horizon+1):(2*horizon)]
+  upper_preds_hobbies_ca_1_ts = new_forecast$fcst$hobbies_ca_1_ts[(2*horizon+1):(3*horizon)]
+  total_pl[1] = total_pl[1] + pinball_loss(tau,as.numeric(hobbies_ca_1_ts),as.numeric(testing_hobbies_ca_1_ts[1:horizon]),lower_preds_hobbies_ca_1_ts,horizon)
+  total_pl[1] = total_pl[1] + pinball_loss(1-tau,as.numeric(hobbies_ca_1_ts),as.numeric(testing_hobbies_ca_1_ts[1:horizon]),upper_preds_hobbies_ca_1_ts,horizon)
+  
+  lower_preds_household_1_ca_1 = new_forecast$fcst$household_1_ca_1_ts[(horizon+1):(2*horizon)]
+  upper_preds_household_1_ca_1 = new_forecast$fcst$household_1_ca_1_ts[(2*horizon+1):(3*horizon)]
+  total_pl[2] = total_pl[2] + pinball_loss(tau,as.numeric(household_1_ca_1_ts),as.numeric(testing_household_1_ca_1_ts[1:horizon]),lower_preds_household_1_ca_1,horizon)
+  total_pl[2] = total_pl[2] + pinball_loss(1-tau,as.numeric(household_1_ca_1_ts),as.numeric(testing_household_1_ca_1_ts[1:horizon]),upper_preds_household_1_ca_1,horizon)
+  
+  lower_preds_household_2_ca_1 = new_forecast$fcst$household_2_ca_1_ts[(horizon+1):(2*horizon)]
+  upper_preds_household_2_ca_1 = new_forecast$fcst$household_2_ca_1_ts[(2*horizon+1):(3*horizon)]
+  total_pl[3] = total_pl[3] + pinball_loss(tau,as.numeric(household_2_ca_1_ts),as.numeric(testing_household_2_ca_1_ts[1:horizon]),lower_preds_household_2_ca_1,horizon)
+  total_pl[3] = total_pl[3] + pinball_loss(1-tau,as.numeric(household_2_ca_1_ts),as.numeric(testing_household_2_ca_1_ts[1:horizon]),upper_preds_household_2_ca_1,horizon)
+  
+  lower_preds_foods_1_ca_1 = new_forecast$fcst$foods_1_ca_1_ts[(horizon+1):(2*horizon)]
+  upper_preds_foods_1_ca_1 = new_forecast$fcst$foods_1_ca_1_ts[(2*horizon+1):(3*horizon)]
+  total_pl[4] = total_pl[4] + pinball_loss(tau,as.numeric(foods_1_ca_1_ts),as.numeric(testing_foods_1_ca_1_ts[1:horizon]),lower_preds_foods_1_ca_1,horizon)
+  total_pl[4] = total_pl[4] + pinball_loss(1-tau,as.numeric(foods_1_ca_1_ts),as.numeric(testing_foods_1_ca_1_ts[1:horizon]),upper_preds_foods_1_ca_1,horizon)
+  
+  lower_preds_foods_2_ca_1 = new_forecast$fcst$foods_2_ca_1_ts[(horizon+1):(2*horizon)]
+  upper_preds_foods_2_ca_1 = new_forecast$fcst$foods_2_ca_1_ts[(2*horizon+1):(3*horizon)]
+  total_pl[5] = total_pl[5] + pinball_loss(tau,as.numeric(foods_2_ca_1_ts),as.numeric(testing_foods_2_ca_1_ts[1:horizon]),lower_preds_foods_2_ca_1,horizon)
+  total_pl[5] = total_pl[5] + pinball_loss(1-tau,as.numeric(foods_2_ca_1_ts),as.numeric(testing_foods_2_ca_1_ts[1:horizon]),upper_preds_foods_2_ca_1,horizon)
+  
+  lower_preds_foods_3_ca_1 = new_forecast$fcst$foods_3_ca_1_ts[(horizon+1):(2*horizon)]
+  upper_preds_foods_3_ca_1 = new_forecast$fcst$foods_3_ca_1_ts[(2*horizon+1):(3*horizon)]
+  total_pl[6] = total_pl[6] + pinball_loss(tau,as.numeric(foods_3_ca_1_ts),as.numeric(testing_foods_3_ca_1_ts[1:horizon]),lower_preds_foods_3_ca_1,horizon)
+  total_pl[6] = total_pl[6] + pinball_loss(1-tau,as.numeric(foods_3_ca_1_ts),as.numeric(testing_foods_3_ca_1_ts[1:horizon]),upper_preds_foods_3_ca_1,horizon)
+  
+
+  
+  lower_preds_hobbies_ca_2_ts = new_forecast$fcst$hobbies_ca_2_ts[(horizon+1):(2*horizon)]
+  upper_preds_hobbies_ca_2_ts = new_forecast$fcst$hobbies_ca_2_ts[(2*horizon+1):(3*horizon)]
+  total_pl[7] = total_pl[7] + pinball_loss(tau,as.numeric(hobbies_ca_2_ts),as.numeric(testing_hobbies_ca_2_ts[1:horizon]),lower_preds_hobbies_ca_2_ts,horizon)
+  total_pl[7] = total_pl[7] + pinball_loss(1-tau,as.numeric(hobbies_ca_2_ts),as.numeric(testing_hobbies_ca_2_ts[1:horizon]),upper_preds_hobbies_ca_2_ts,horizon)
+  
+  lower_preds_household_1_ca_2 = new_forecast$fcst$household_1_ca_2_ts[(horizon+1):(2*horizon)]
+  upper_preds_household_1_ca_2 = new_forecast$fcst$household_1_ca_2_ts[(2*horizon+1):(3*horizon)]
+  total_pl[8] = total_pl[8] + pinball_loss(tau,as.numeric(household_1_ca_2_ts),as.numeric(testing_household_1_ca_2_ts[1:horizon]),lower_preds_household_1_ca_2,horizon)
+  total_pl[8] = total_pl[8] + pinball_loss(1-tau,as.numeric(household_1_ca_2_ts),as.numeric(testing_household_1_ca_2_ts[1:horizon]),upper_preds_household_1_ca_2,horizon)
+  
+  lower_preds_household_2_ca_2 = new_forecast$fcst$household_2_ca_2_ts[(horizon+1):(2*horizon)]
+  upper_preds_household_2_ca_2 = new_forecast$fcst$household_2_ca_2_ts[(2*horizon+1):(3*horizon)]
+  total_pl[9] = total_pl[9] + pinball_loss(tau,as.numeric(household_2_ca_2_ts),as.numeric(testing_household_2_ca_2_ts[1:horizon]),lower_preds_household_2_ca_2,horizon)
+  total_pl[9] = total_pl[9] + pinball_loss(1-tau,as.numeric(household_2_ca_2_ts),as.numeric(testing_household_2_ca_2_ts[1:horizon]),upper_preds_household_2_ca_2,horizon)
+  
+  lower_preds_foods_1_ca_2 = new_forecast$fcst$foods_1_ca_2_ts[(horizon+1):(2*horizon)]
+  upper_preds_foods_1_ca_2 = new_forecast$fcst$foods_1_ca_2_ts[(2*horizon+1):(3*horizon)]
+  total_pl[10] = total_pl[10] + pinball_loss(tau,as.numeric(foods_1_ca_2_ts),as.numeric(testing_foods_1_ca_2_ts[1:horizon]),lower_preds_foods_1_ca_2,horizon)
+  total_pl[10] = total_pl[10] + pinball_loss(1-tau,as.numeric(foods_1_ca_2_ts),as.numeric(testing_foods_1_ca_2_ts[1:horizon]),upper_preds_foods_1_ca_2,horizon)
+  
+  lower_preds_foods_2_ca_2 = new_forecast$fcst$foods_2_ca_2_ts[(horizon+1):(2*horizon)]
+  upper_preds_foods_2_ca_2 = new_forecast$fcst$foods_2_ca_2_ts[(2*horizon+1):(3*horizon)]
+  total_pl[11] = total_pl[11] + pinball_loss(tau,as.numeric(foods_2_ca_2_ts),as.numeric(testing_foods_2_ca_2_ts[1:horizon]),lower_preds_foods_2_ca_2,horizon)
+  total_pl[11] = total_pl[11] + pinball_loss(1-tau,as.numeric(foods_2_ca_2_ts),as.numeric(testing_foods_2_ca_2_ts[1:horizon]),upper_preds_foods_2_ca_2,horizon)
+  
+  lower_preds_foods_3_ca_2 = new_forecast$fcst$foods_3_ca_2_ts[(horizon+1):(2*horizon)]
+  upper_preds_foods_3_ca_2 = new_forecast$fcst$foods_3_ca_2_ts[(2*horizon+1):(3*horizon)]
+  total_pl[12] = total_pl[12] + pinball_loss(tau,as.numeric(foods_3_ca_2_ts),as.numeric(testing_foods_3_ca_2_ts[1:horizon]),lower_preds_foods_3_ca_2,horizon)
+  total_pl[12] = total_pl[12] + pinball_loss(1-tau,as.numeric(foods_3_ca_2_ts),as.numeric(testing_foods_3_ca_2_ts[1:horizon]),upper_preds_foods_3_ca_2,horizon)
+  
+  
+  
+  
+  lower_preds_hobbies_ca_3_ts = new_forecast$fcst$hobbies_ca_3_ts[(horizon+1):(2*horizon)]
+  upper_preds_hobbies_ca_3_ts = new_forecast$fcst$hobbies_ca_3_ts[(2*horizon+1):(3*horizon)]
+  total_pl[13] = total_pl[13] + pinball_loss(tau,as.numeric(hobbies_ca_3_ts),as.numeric(testing_hobbies_ca_3_ts[1:horizon]),lower_preds_hobbies_ca_3_ts,horizon)
+  total_pl[13] = total_pl[13] + pinball_loss(1-tau,as.numeric(hobbies_ca_3_ts),as.numeric(testing_hobbies_ca_3_ts[1:horizon]),upper_preds_hobbies_ca_3_ts,horizon)
+  
+  lower_preds_household_1_ca_3 = new_forecast$fcst$household_1_ca_3_ts[(horizon+1):(2*horizon)]
+  upper_preds_household_1_ca_3 = new_forecast$fcst$household_1_ca_3_ts[(2*horizon+1):(3*horizon)]
+  total_pl[14] = total_pl[14] + pinball_loss(tau,as.numeric(household_1_ca_3_ts),as.numeric(testing_household_1_ca_3_ts[1:horizon]),lower_preds_household_1_ca_3,horizon)
+  total_pl[14] = total_pl[14] + pinball_loss(1-tau,as.numeric(household_1_ca_3_ts),as.numeric(testing_household_1_ca_3_ts[1:horizon]),upper_preds_household_1_ca_3,horizon)
+  
+  lower_preds_household_2_ca_3 = new_forecast$fcst$household_2_ca_3_ts[(horizon+1):(2*horizon)]
+  upper_preds_household_2_ca_3 = new_forecast$fcst$household_2_ca_3_ts[(2*horizon+1):(3*horizon)]
+  total_pl[15] = total_pl[15] + pinball_loss(tau,as.numeric(household_2_ca_3_ts),as.numeric(testing_household_2_ca_3_ts[1:horizon]),lower_preds_household_2_ca_3,horizon)
+  total_pl[15] = total_pl[15] + pinball_loss(1-tau,as.numeric(household_2_ca_3_ts),as.numeric(testing_household_2_ca_3_ts[1:horizon]),upper_preds_household_2_ca_3,horizon)
+  
+  lower_preds_foods_1_ca_3 = new_forecast$fcst$foods_1_ca_3_ts[(horizon+1):(2*horizon)]
+  upper_preds_foods_1_ca_3 = new_forecast$fcst$foods_1_ca_3_ts[(2*horizon+1):(3*horizon)]
+  total_pl[16] = total_pl[16] + pinball_loss(tau,as.numeric(foods_1_ca_3_ts),as.numeric(testing_foods_1_ca_3_ts[1:horizon]),lower_preds_foods_1_ca_3,horizon)
+  total_pl[16] = total_pl[16] + pinball_loss(1-tau,as.numeric(foods_1_ca_3_ts),as.numeric(testing_foods_1_ca_3_ts[1:horizon]),upper_preds_foods_1_ca_3,horizon)
+  
+  lower_preds_foods_2_ca_3 = new_forecast$fcst$foods_2_ca_3_ts[(horizon+1):(2*horizon)]
+  upper_preds_foods_2_ca_3 = new_forecast$fcst$foods_2_ca_3_ts[(2*horizon+1):(3*horizon)]
+  total_pl[17] = total_pl[17] + pinball_loss(tau,as.numeric(foods_2_ca_3_ts),as.numeric(testing_foods_2_ca_3_ts[1:horizon]),lower_preds_foods_2_ca_3,horizon)
+  total_pl[17] = total_pl[17] + pinball_loss(1-tau,as.numeric(foods_2_ca_3_ts),as.numeric(testing_foods_2_ca_3_ts[1:horizon]),upper_preds_foods_2_ca_3,horizon)
+  
+  lower_preds_foods_3_ca_3 = new_forecast$fcst$foods_3_ca_3_ts[(horizon+1):(2*horizon)]
+  upper_preds_foods_3_ca_3 = new_forecast$fcst$foods_3_ca_3_ts[(2*horizon+1):(3*horizon)]
+  total_pl[18] = total_pl[18] + pinball_loss(tau,as.numeric(foods_3_ca_3_ts),as.numeric(testing_foods_3_ca_3_ts[1:horizon]),lower_preds_foods_3_ca_3,horizon)
+  total_pl[18] = total_pl[18] + pinball_loss(1-tau,as.numeric(foods_3_ca_3_ts),as.numeric(testing_foods_3_ca_3_ts[1:horizon]),upper_preds_foods_3_ca_3,horizon)
+  
+  
+  }
+total_pl = total_pl/((2*length(cis))+1)
+print("Average SPL values:", quote=FALSE)
+print(total_pl)
+```
+
+```{r store SPL values for large VAR model}
+complete_loss_df[, split_n+3] = total_pl[1,]
+```
+
+
+After running for all 3 splits, we calculate average and store results in a file
+
+```{r saving results of large model in file}
+complete_loss_df$average_RMSSE = rowMeans(complete_loss_df[,c("split_1_rmsse","split_2_rmsse","split_3_rmsse")])
+complete_loss_df$average_SPL = rowMeans(complete_loss_df[,c("split_1_spl","split_2_spl","split_3_spl")])
+write.csv(complete_loss_df, "Complete_VAR_losses.csv", row.names = TRUE)
+```
+

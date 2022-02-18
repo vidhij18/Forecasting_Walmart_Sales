@@ -1,0 +1,686 @@
+---
+title: "Forecasting_v1"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+library(fpp)
+library(fpp3)
+library(dplyr)
+library(gridExtra)
+library(lubridate)
+
+```
+```{r}
+data = read.csv('C:/Users/Aashima/T1/Forecasting/Project Material/Projectdata.csv', header=TRUE,sep=",")
+print(head(data))
+
+```
+```{r}
+calender = read.csv("C:/Users/Aashima/T1/Forecasting/Project Material/calendar.csv",header=TRUE,sep=",")
+tail(calender)
+calender$IsEvent[calender$event_name_1 == ""] = 0
+calender$IsEvent[calender$event_name_1 != ""] = 1
+x_reg = cbind(calender$snap_CA, calender$IsEvent)
+head(x_reg)
+```
+```{r pressure, echo=FALSE}
+
+#Store 1
+#Hobbies_CA_1
+data2 = data.frame(data[1],data[2]) 
+Hobbies_CA_1 = ts(data$Hobbies_CA_1, frequency = 365, start = c(2011, 1, 29))
+acf(Hobbies_CA_1)
+
+#Household_1_CA_1
+Household_1_CA_1 = ts(data$Household_1_CA_1, frequency = 365, start = c(2011, 1, 29))
+acf(Household_1_CA_1)
+
+#Household_2_CA_1
+Household_2_CA_1 = ts(data$Household_2_CA_1, frequency = 365, start = c(2011, 1, 29))
+acf(Household_2_CA_1)
+
+#Foods_1_CA_1
+Foods_1_CA_1 = ts(data$Foods_1_CA_1, frequency = 365, start = c(2011, 1, 29))
+acf(Foods_1_CA_1)
+
+#Foods_2_CA_1
+Foods_2_CA_1 = ts(data$Foods_2_CA_1, frequency = 365, start = c(2011, 1, 29))
+acf(Foods_2_CA_1)
+
+#Foods_3_CA_1
+Foods_3_CA_1 =  ts(data$Foods_3_CA_1, frequency = 365, start = c(2011, 1, 29))
+acf(Foods_3_CA_1)
+
+
+#Store 2
+#Hobbies_CA_2
+Hobbies_CA_2 =ts(data$Hobbies_CA_2, frequency = 365, start = c(2011, 1, 29))
+acf(Hobbies_CA_2)
+
+#Household_1_CA_2
+Household_1_CA_2 = ts(data$Household_1_CA_2, frequency = 365, start = c(2011, 1, 29))
+acf(Household_1_CA_2)
+
+#Household_2_CA_2
+Household_2_CA_2 = ts(data$Household_2_CA_2, frequency = 365, start = c(2011, 1, 29))
+acf(Household_2_CA_2)
+
+#Foods_1_CA_2
+Foods_1_CA_2 = ts(data$Foods_1_CA_2, frequency = 365, start = c(2011, 1, 29))
+acf(Foods_1_CA_2)
+
+#Foods_2_CA_2
+Foods_2_CA_2 = ts(data$Foods_2_CA_2, frequency = 365, start = c(2011, 1, 29))
+acf(Foods_2_CA_2)
+
+#Foods_3_CA_2
+Foods_3_CA_2 = ts(data$Foods_3_CA_2, frequency = 365, start = c(2011, 1, 29))
+acf(Foods_3_CA_2)
+
+
+#Store 3
+#Hobbies_CA_3
+Hobbies_CA_3 = ts(data$Hobbies_CA_3, frequency = 365, start = c(2011, 1, 29))
+acf(Hobbies_CA_3)
+
+#Household_1_CA_3
+Household_1_CA_3 = ts(data$Household_1_CA_3, frequency = 365, start = c(2011, 1, 29))
+acf(Household_1_CA_3)
+
+#Household_2_CA_3
+Household_2_CA_3 = ts(data$Household_2_CA_3, frequency = 365, start = c(2011, 1, 29))
+acf(Household_2_CA_3)
+
+#Foods_1_CA_3
+Foods_1_CA_3 = ts(data$Foods_1_CA_3, frequency = 365, start = c(2011, 1, 29))
+acf(Foods_1_CA_3)
+
+#Foods_2_CA_3
+Foods_2_CA_3 = ts(data$Foods_2_CA_3, frequency = 365, start = c(2011, 1, 29))
+acf(Foods_2_CA_3)
+
+#Foods_3_CA_3
+Foods_3_CA_3 =ts(data$Foods_3_CA_3, frequency = 365, start = c(2011, 1, 29))
+acf(Foods_3_CA_3)
+
+```
+```{r}
+#Store 1
+#Hobbies_CA_1
+pacf(data$Hobbies_CA_1)
+
+#Household_1_CA_1
+pacf(data$Household_1_CA_1)
+
+#Household_2_CA_1
+pacf(data$Household_2_CA_1)
+
+#Foods_1_CA_1
+pacf(data$Foods_1_CA_1)
+
+#Foods_2_CA_1
+pacf(data$Foods_2_CA_1)
+
+pacf(data$Foods_3_CA_1)
+
+
+#Store 2
+#Hobbies_CA_2
+pacf(data$Hobbies_CA_2)
+
+#Household_1_CA_2
+pacf(data$Household_1_CA_2)
+
+#Household_2_CA_2
+pacf(data$Household_2_CA_2)
+
+#Foods_1_CA_2
+pacf(data$Foods_1_CA_2)
+
+#Foods_2_CA_2
+pacf(data$Foods_2_CA_2)
+
+#Foods_3_CA_2
+pacf(data$Foods_3_CA_2)
+
+
+#Store 3
+#Hobbies_CA_3
+pacf(data$Hobbies_CA_3)
+
+#Household_1_CA_3
+pacf(data$Household_1_CA_3)
+
+#Household_2_CA_3
+pacf(data$Household_2_CA_3)
+
+#Foods_1_CA_3
+pacf(data$Foods_1_CA_3)
+
+#Foods_2_CA_3
+pacf(data$Foods_2_CA_3)
+
+#Foods_3_CA_3
+pacf(data$Foods_3_CA_3)
+
+```
+```{r}
+#ADF Test
+#Performing ADF tests to check the stationarity of the data
+#Store 1
+adf.test(data$Hobbies_CA_1)
+adf.test(data$Household_1_CA_1)
+adf.test(data$Household_2_CA_1)
+adf.test(data$Foods_1_CA_1)
+adf.test(data$Foods_2_CA_1)
+adf.test(data$Foods_3_CA_1)
+
+#Store 2
+adf.test(data$Hobbies_CA_2)
+adf.test(data$Household_1_CA_2)
+adf.test(data$Household_2_CA_2)
+adf.test(data$Foods_1_CA_2)
+adf.test(data$Foods_2_CA_2)
+adf.test(data$Foods_3_CA_2)
+
+#Store 3
+adf.test(data$Hobbies_CA_3)
+adf.test(data$Household_1_CA_3)
+adf.test(data$Household_2_CA_3)
+adf.test(data$Foods_1_CA_3)
+adf.test(data$Foods_2_CA_3)
+adf.test(data$Foods_3_CA_3)
+```
+```{r}
+#Data_Split 1
+data_train1 = head(ts(data,frequency = 365, start = c(2011, 1, 29)),1433)
+data_test1 =  tail(ts(data,frequency = 365, start = c(2011, 1, 29)),536)
+
+
+#Data Split 2
+data_train2 = head(ts(data,frequency = 365, start = c(2011, 1, 29)),1614)
+data_test2 = tail(ts(data,frequency = 365, start = c(2011, 1, 29)),355)
+
+#Data split 3
+data_train3 = head(ts(data,frequency = 365, start = c(2011, 1, 29)),1798)
+data_test3 = tail(ts(data,frequency = 365, start = c(2011, 1, 29)),171)
+
+```
+
+```{r}
+
+pinball_loss <- function(tau, train, test, pred, horizon) {
+  # tau is the level of quantile that you want
+  # test is the test data
+  # pred is the predicted data
+  # horizon is the number of predicted forecasts
+  # train is the train data
+  num = 0
+  pl_df = data.frame(tau = tau,
+                     test = test,
+                     pred = pred)
+  pl_df = pl_df %>%
+    mutate(L = ifelse(test>=pred,tau/horizon * (test-pred),((1-tau)/horizon) * (pred-test)))
+  num = sum(pl_df$L)
+  den = 0
+  for (i in 2:length(train)){
+    den = den + abs(train[i] - train[i-1])
+  }
+  den = den/(length(train)-1)
+  
+  return(num/den)
+}
+
+```
+
+```{r}
+####7. Consider the probabilistic forecasts i to vi in the M5 guidelines.
+
+####Probabilistic Forecasts
+
+####Data Split 1
+print("For data Split 1")
+for (i in 1:18){
+
+  ses = ses(data_train1[,i], h = 28, level = c(50, 67, 95, 99))
+  ses = data.frame(cbind(ses$lower[,4], ses$lower[,3], ses$lower[,2], ses$lower[,1],
+                         ses$mean,
+                         ses$upper[,1], ses$upper[,2], ses$upper[,3],ses$upper[,4]))
+
+  print(cat(i,"ses"))
+  average_ses = c(pinball_loss(rep(0.005,28),data_train1[,i],head(data_test1[,i],28),ses$ses.lower...4.,28),
+                 pinball_loss(rep(0.025,28),data_train1[,i],head(data_test1[,i],28),ses$ses.lower...3.,28),
+                 pinball_loss(rep(0.165,28),data_train1[,i],head(data_test1[,i],28),ses$ses.lower...2.,28),
+                 pinball_loss(rep(0.25,28),data_train1[,i],head(data_test1[,i],28),ses$ses.lower...1.,28),
+                 pinball_loss(rep(0.75,28),data_train1[,i],head(data_test1[,i],28),ses$ses.mean,28),
+                 pinball_loss(rep(0.835,28),data_train1[,i],head(data_test1[,i],28),ses$ses.upper...1.,28),
+                 pinball_loss(rep(0.975,28),data_train1[,i],head(data_test1[,i],28),ses$ses.upper...2.,28),
+                 pinball_loss(rep(0.995,28),data_train1[,i],head(data_test1[,i],28),ses$ses.upper...3.,28),
+                 pinball_loss(rep(0.995,28),data_train1[,i],head(data_test1[,i],28),ses$ses.upper...4.,28))
+  
+  print(average_ses)
+  
+  #NAIVE
+  naive = naive(data_train1[,i], h = 28, level = c(50, 67, 95, 99))
+  naive = data.frame(cbind(naive$lower[,4], naive$lower[,3], naive$lower[,2], naive$lower[,1],
+                           naive$mean,
+                           naive$upper[,1], naive$upper[,2], naive$upper[,3], naive$upper[,4]))
+  print(cat(i,"naive"))
+  
+  average_naive = c(pinball_loss(rep(0.005,28),data_train1[,i],head(data_test1[,i],28),naive$naive.lower...4.,28),
+                       pinball_loss(rep(0.025,28),data_train1[,i],head(data_test1[,i],28),naive$naive.lower...3.,28),
+                       pinball_loss(rep(0.165,28),data_train1[,i],head(data_test1[,i],28),naive$naive.lower...2.,28),
+                       pinball_loss(rep(0.25,28),data_train1[,i],head(data_test1[,i],28),naive$naive.lower...1.,28),
+                       pinball_loss(rep(0.75,28),data_train1[,i],head(data_test1[,i],28),naive$naive.mean,28),
+                       pinball_loss(rep(0.835,28),data_train1[,i],head(data_test1[,i],28),naive$naive.upper...1.,28),
+                       pinball_loss(rep(0.975,28),data_train1[,i],head(data_test1[,i],28),naive$naive.upper...2.,28),
+                       pinball_loss(rep(0.995,28),data_train1[,i],head(data_test1[,i],28),naive$naive.upper...3.,28),
+                       pinball_loss(rep(0.995,28),data_train1[,i],head(data_test1[,i],28),naive$naive.upper...4.,28))
+
+  print(average_naive)
+  
+  #sNaive
+  snaive = snaive(data_train1[,i], h = 28, level = c(50, 67, 95, 99))
+  snaive = data.frame(cbind(snaive$lower[,4], snaive$lower[,3], snaive$lower[,2], snaive$lower[,1],
+                            snaive$mean,
+                            snaive$upper[,1], snaive$upper[,2], snaive$upper[,3], snaive$upper[,4]))
+  
+  print(cat(i,"snaive"))
+  average_snaive = c(pinball_loss(rep(0.005,28),data_train1[,i],head(data_test1[,i],28),snaive$snaive.lower...4.,28),
+                        pinball_loss(rep(0.025,28),data_train1[,i],head(data_test1[,i],28),snaive$snaive.lower...3.,28),
+                        pinball_loss(rep(0.165,28),data_train1[,i],head(data_test1[,i],28),snaive$snaive.lower...2.,28),
+                        pinball_loss(rep(0.25,28),data_train1[,i],head(data_test1[,i],28),snaive$snaive.lower...1.,28),
+                        pinball_loss(rep(0.75,28),data_train1[,i],head(data_test1[,i],28),snaive$snaive.mean,28),
+                        pinball_loss(rep(0.835,28),data_train1[,i],head(data_test1[,i],28),snaive$snaive.upper...1.,28),
+                        pinball_loss(rep(0.975,28),data_train1[,i],head(data_test1[,i],28),snaive$snaive.upper...2.,28),
+                        pinball_loss(rep(0.995,28),data_train1[,i],head(data_test1[,i],28),snaive$snaive.upper...3.,28),
+                        pinball_loss(rep(0.995,28),data_train1[,i],head(data_test1[,i],28),snaive$snaive.upper...4.,28))
+  print(average_snaive)
+  
+  
+  #Exponential Smoothing (Bottom up approach)
+  etsb = forecast(ets(data_train1[,i]), method="bu", fmethod="arima",h=28,level = c(50, 67, 95, 99))
+  etsb = data.frame(cbind(etsb$lower[,4], etsb$lower[,3], etsb$lower[,2], etsb$lower[,1],
+                         etsb$mean,
+                         etsb$upper[,1], etsb$upper[,2], etsb$upper[,3], etsb$upper[,4]))
+  print(cat(i,"Exp Smoothing"))
+  average_etsb = c(pinball_loss(rep(0.005,28),data_train1[,i],head(data_test1[,i],28),etsb$etsb.lower...4.,28),
+                      pinball_loss(rep(0.025,28),data_train1[,i],head(data_test1[,i],28),etsb$etsb.lower...3.,28),
+                      pinball_loss(rep(0.165,28),data_train1[,i],head(data_test1[,i],28),etsb$etsb.lower...2.,28),
+                      pinball_loss(rep(0.25,28),data_train1[,i],head(data_test1[,i],28),etsb$etsb.lower...1.,28),
+                      pinball_loss(rep(0.75,28),data_train1[,i],head(data_test1[,i],28),etsb$etsb.mean,28),
+                      pinball_loss(rep(0.835,28),data_train1[,i],head(data_test1[,i],28),etsb$etsb.upper...1.,28),
+                      pinball_loss(rep(0.975,28),data_train1[,i],head(data_test1[,i],28),etsb$etsb.upper...2.,28),
+                      pinball_loss(rep(0.995,28),data_train1[,i],head(data_test1[,i],28),etsb$etsb.upper...3.,28),
+                      pinball_loss(rep(0.995,28),data_train1[,i],head(data_test1[,i],28),etsb$etsb.upper...4.,28))
+  
+  print(average_etsb)
+
+  
+  #AutoRegressive Integrated Moving Average (ARIMA)
+  arima = forecast(auto.arima(data_train1[,i]), h = 28, level = c(50, 67, 95, 99))
+  arima = data.frame(cbind(arima$lower[,4], arima$lower[,3], arima$lower[,2], arima$lower[,1],
+                           arima$mean,
+                           arima$upper[,1], arima$upper[,2], arima$upper[,3], arima$upper[,4]))
+  print(cat(i,"ARIMA"))
+  average_arima = c(pinball_loss(rep(0.005,28),data_train1[,i],head(data_test1[,i],28),arima$arima.lower...4.,28),
+                       pinball_loss(rep(0.025,28),data_train1[,i],head(data_test1[,i],28),arima$arima.lower...3.,28),
+                       pinball_loss(rep(0.165,28),data_train1[,i],head(data_test1[,i],28),arima$arima.lower...2.,28),
+                       pinball_loss(rep(0.25,28),data_train1[,i],head(data_test1[,i],28),arima$arima.lower...1.,28),
+                       pinball_loss(rep(0.75,28),data_train1[,i],head(data_test1[,i],28),arima$arima.mean,28),
+                       pinball_loss(rep(0.835,28),data_train1[,i],head(data_test1[,i],28),arima$arima.upper...1.,28),
+                       pinball_loss(rep(0.975,28),data_train1[,i],head(data_test1[,i],28),arima$arima.upper...2.,28),
+                       pinball_loss(rep(0.995,28),data_train1[,i],head(data_test1[,i],28),arima$arima.upper...3.,28),
+                       pinball_loss(rep(0.995,28),data_train1[,i],head(data_test1[,i],28),arima$arima.upper...4.,28))
+  
+  print(average_arima)
+
+  
+  #Kernel Density Function
+  quants = as.numeric(quantile(data_train1[,i],c(0.005, 0.025, 0.165, 0.25, 0.5, 0.75, 0.835, 0.975, 0.995)))
+  kernel = data.frame(cbind(rep(quants[1],28), rep(quants[2],28), rep(quants[3],28),
+                            rep(quants[4],28), rep(quants[5],28), rep(quants[6],28),
+                            rep(quants[7],28), rep(quants[8],28), rep(quants[9],28)))
+  print(cat(i,"Kernel"))
+  
+  average_kernel = c(pinball_loss(rep(0.005,28),data_train1[,i],head(data_test1[,i],28),kernel$X1,28),
+                             pinball_loss(rep(0.025,28),data_train1[,i],head(data_test1[,i],28),kernel$X2,28),
+                             pinball_loss(rep(0.165,28),data_train1[,i],head(data_test1[,i],28),kernel$X3,28),
+                             pinball_loss(rep(0.25,28),data_train1[,i],head(data_test1[,i],28),kernel$X4,28),
+                             pinball_loss(rep(0.75,28),data_train1[,i],head(data_test1[,i],28),kernel$X5,28),
+                             pinball_loss(rep(0.835,28),data_train1[,i],head(data_test1[,i],28),kernel$X6,28),
+                             pinball_loss(rep(0.975,28),data_train1[,i],head(data_test1[,i],28),kernel$X7,28),
+                             pinball_loss(rep(0.995,28),data_train1[,i],head(data_test1[,i],28),kernel$X8,28),
+                             pinball_loss(rep(0.995,28),data_train1[,i],head(data_test1[,i],28),kernel$X8,28))
+  print(average_kernel)
+}
+```
+
+```{r}
+#Data Split 2
+print("For data Split 2")
+for (i in 1:18){
+  y  = c(0.005, 0.025, 0.165, 0.25, 0.5, 0.75, 0.835, 0.975, 0.995)
+  colnames(ses) <- y
+  
+  
+  ses = ses(data_train2[,i], h = 28, level = c(50, 67, 95, 99))
+  ses = data.frame(cbind(ses$lower[,4], ses$lower[,3], ses$lower[,2], ses$lower[,1],
+                         ses$mean,
+                         ses$upper[,1], ses$upper[,2], ses$upper[,3],ses$upper[,4]))
+  
+  print(cat(i,"ses"))
+  average_ses_2 = c(pinball_loss(rep(0.005,28),data_train2[,i],head(data_test2[,i],28),ses$ses.lower...4.,28),
+                          pinball_loss(rep(0.025,28),data_train2[,i],head(data_test2[,i],28),ses$ses.lower...3.,28),
+                          pinball_loss(rep(0.165,28),data_train2[,i],head(data_test2[,i],28),ses$ses.lower...2.,28),
+                          pinball_loss(rep(0.25,28),data_train2[,i],head(data_test2[,i],28),ses$ses.lower...1.,28),
+                          pinball_loss(rep(0.75,28),data_train2[,i],head(data_test2[,i],28),ses$ses.mean,28),
+                          pinball_loss(rep(0.835,28),data_train2[,i],head(data_test2[,i],28),ses$ses.upper...1.,28),
+                          pinball_loss(rep(0.975,28),data_train2[,i],head(data_test2[,i],28),ses$ses.upper...2.,28),
+                          pinball_loss(rep(0.995,28),data_train2[,i],head(data_test2[,i],28),ses$ses.upper...3.,28),
+                          pinball_loss(rep(0.995,28),data_train2[,i],head(data_test2[,i],28),ses$ses.upper...4.,28))
+  
+  print(average_ses_2)
+  
+  #NAIVE
+  naive = naive(data_train2[,i], h = 28, level = c(50, 67, 95, 99))
+  naive = data.frame(cbind(naive$lower[,4], naive$lower[,3], naive$lower[,2], naive$lower[,1],
+                           naive$mean,
+                           naive$upper[,1], naive$upper[,2], naive$upper[,3], naive$upper[,4]))
+  print(cat(i,"naive"))
+  
+  average_naive_2 = c(pinball_loss(rep(0.005,28),data_train2[,i],head(data_test2[,i],28),naive$naive.lower...4.,28),
+                            pinball_loss(rep(0.025,28),data_train2[,i],head(data_test2[,i],28),naive$naive.lower...3.,28),
+                            pinball_loss(rep(0.165,28),data_train2[,i],head(data_test2[,i],28),naive$naive.lower...2.,28),
+                            pinball_loss(rep(0.25,28),data_train2[,i],head(data_test2[,i],28),naive$naive.lower...1.,28),
+                            pinball_loss(rep(0.75,28),data_train2[,i],head(data_test2[,i],28),naive$naive.mean,28),
+                            pinball_loss(rep(0.835,28),data_train2[,i],head(data_test2[,i],28),naive$naive.upper...1.,28),
+                            pinball_loss(rep(0.975,28),data_train2[,i],head(data_test2[,i],28),naive$naive.upper...2.,28),
+                            pinball_loss(rep(0.995,28),data_train2[,i],head(data_test2[,i],28),naive$naive.upper...3.,28),
+                            pinball_loss(rep(0.995,28),data_train2[,i],head(data_test2[,i],28),naive$naive.upper...4.,28))
+  
+  print(average_naive_2)
+  
+  #sNaive
+  snaive = snaive(data_train2[,i], h = 28, level = c(50, 67, 95, 99))
+  snaive = data.frame(cbind(snaive$lower[,4], snaive$lower[,3], snaive$lower[,2], snaive$lower[,1],
+                            snaive$mean,
+                            snaive$upper[,1], snaive$upper[,2], snaive$upper[,3], snaive$upper[,4]))
+  
+  print(cat(i,"snaive"))
+  average_snaive_2 = c(pinball_loss(rep(0.005,28),data_train2[,i],head(data_test2[,i],28),snaive$snaive.lower...4.,28),
+                             pinball_loss(rep(0.025,28),data_train2[,i],head(data_test2[,i],28),snaive$snaive.lower...3.,28),
+                             pinball_loss(rep(0.165,28),data_train2[,i],head(data_test2[,i],28),snaive$snaive.lower...2.,28),
+                             pinball_loss(rep(0.25,28),data_train2[,i],head(data_test2[,i],28),snaive$snaive.lower...1.,28),
+                             pinball_loss(rep(0.75,28),data_train2[,i],head(data_test2[,i],28),snaive$snaive.mean,28),
+                             pinball_loss(rep(0.835,28),data_train2[,i],head(data_test2[,i],28),snaive$snaive.upper...1.,28),
+                             pinball_loss(rep(0.975,28),data_train2[,i],head(data_test2[,i],28),snaive$snaive.upper...2.,28),
+                             pinball_loss(rep(0.995,28),data_train2[,i],head(data_test2[,i],28),snaive$snaive.upper...3.,28),
+                             pinball_loss(rep(0.995,28),data_train2[,i],head(data_test2[,i],28),snaive$snaive.upper...4.,28))
+  
+  print(average_snaive_2)
+  
+  #Exponential Smoothing (Bottom up approach)
+  etsb = forecast(ets(data_train2[,i]), method="bu", fmethod="arima",h=28,level = c(50, 67, 95, 99))
+  etsb = data.frame(cbind(etsb$lower[,4], etsb$lower[,3], etsb$lower[,2], etsb$lower[,1],
+                          etsb$mean,
+                          etsb$upper[,1], etsb$upper[,2], etsb$upper[,3], etsb$upper[,4]))
+  print(cat(i,"Exp Smoothing"))
+  average_etsb_2 = c(pinball_loss(rep(0.005,28),data_train2[,i],head(data_test2[,i],28),etsb$etsb.lower...4.,28),
+                           pinball_loss(rep(0.025,28),data_train2[,i],head(data_test2[,i],28),etsb$etsb.lower...3.,28),
+                           pinball_loss(rep(0.165,28),data_train2[,i],head(data_test2[,i],28),etsb$etsb.lower...2.,28),
+                           pinball_loss(rep(0.25,28),data_train2[,i],head(data_test2[,i],28),etsb$etsb.lower...1.,28),
+                           pinball_loss(rep(0.75,28),data_train2[,i],head(data_test2[,i],28),etsb$etsb.mean,28),
+                           pinball_loss(rep(0.835,28),data_train2[,i],head(data_test2[,i],28),etsb$etsb.upper...1.,28),
+                           pinball_loss(rep(0.975,28),data_train2[,i],head(data_test2[,i],28),etsb$etsb.upper...2.,28),
+                           pinball_loss(rep(0.995,28),data_train2[,i],head(data_test2[,i],28),etsb$etsb.upper...3.,28),
+                           pinball_loss(rep(0.995,28),data_train2[,i],head(data_test2[,i],28),etsb$etsb.upper...4.,28))
+  
+  print(average_etsb_2)
+  
+  #AutoRegressive Integrated Moving Average (ARIMA)
+  arima = forecast(auto.arima(data_train2[,i]), h = 28, level = c(50, 67, 95, 99))
+  arima = data.frame(cbind(arima$lower[,4], arima$lower[,3], arima$lower[,2], arima$lower[,1],
+                           arima$mean,
+                           arima$upper[,1], arima$upper[,2], arima$upper[,3], arima$upper[,4]))
+  print(cat(i,"ARIMA"))
+  average_arima_2 = c(pinball_loss(rep(0.005,28),data_train2[,i],head(data_test2[,i],28),arima$arima.lower...4.,28),
+                            pinball_loss(rep(0.025,28),data_train2[,i],head(data_test2[,i],28),arima$arima.lower...3.,28),
+                            pinball_loss(rep(0.165,28),data_train2[,i],head(data_test2[,i],28),arima$arima.lower...2.,28),
+                            pinball_loss(rep(0.25,28),data_train2[,i],head(data_test2[,i],28),arima$arima.lower...1.,28),
+                            pinball_loss(rep(0.75,28),data_train2[,i],head(data_test2[,i],28),arima$arima.mean,28),
+                            pinball_loss(rep(0.835,28),data_train2[,i],head(data_test2[,i],28),arima$arima.upper...1.,28),
+                            pinball_loss(rep(0.975,28),data_train2[,i],head(data_test2[,i],28),arima$arima.upper...2.,28),
+                            pinball_loss(rep(0.995,28),data_train2[,i],head(data_test2[,i],28),arima$arima.upper...3.,28),
+                            pinball_loss(rep(0.995,28),data_train2[,i],head(data_test2[,i],28),arima$arima.upper...4.,28))
+  
+  print(average_arima_2)
+  
+  #Kernel Density Function
+  quants = as.numeric(quantile(data_train2[,i],c(0.005, 0.025, 0.165, 0.25, 0.5, 0.75, 0.835, 0.975, 0.995)))
+  kernel = data.frame(cbind(rep(quants[1],28), rep(quants[2],28), rep(quants[3],28),
+                            rep(quants[4],28), rep(quants[5],28), rep(quants[6],28),
+                            rep(quants[7],28), rep(quants[8],28), rep(quants[9],28)))
+  print(cat(i,"Kernel"))
+  
+  average_kernel_2 = c(pinball_loss(rep(0.005,28),data_train2[,i],head(data_test2[,i],28),kernel$X1,28),
+                             pinball_loss(rep(0.025,28),data_train2[,i],head(data_test2[,i],28),kernel$X2,28),
+                             pinball_loss(rep(0.165,28),data_train2[,i],head(data_test2[,i],28),kernel$X3,28),
+                             pinball_loss(rep(0.25,28),data_train2[,i],head(data_test2[,i],28),kernel$X4,28),
+                             pinball_loss(rep(0.75,28),data_train2[,i],head(data_test2[,i],28),kernel$X5,28),
+                             pinball_loss(rep(0.835,28),data_train2[,i],head(data_test2[,i],28),kernel$X6,28),
+                             pinball_loss(rep(0.975,28),data_train2[,i],head(data_test2[,i],28),kernel$X7,28),
+                             pinball_loss(rep(0.995,28),data_train2[,i],head(data_test2[,i],28),kernel$X8,28),
+                             pinball_loss(rep(0.995,28),data_train2[,i],head(data_test2[,i],28),kernel$X8,28))
+  
+  print(average_kernel_2)
+  
+}
+```
+
+```{r}
+#Data Split 3
+print("For data Split 3")
+for (i in 1:18){
+  y  = c(0.005, 0.025, 0.165, 0.25, 0.5, 0.75, 0.835, 0.975, 0.995)
+  colnames(ses) <- y
+  
+  
+  ses = ses(data_train3[,i], h = 28, level = c(50, 67, 95, 99))
+  ses = data.frame(cbind(ses$lower[,4], ses$lower[,3], ses$lower[,2], ses$lower[,1],
+                         ses$mean,
+                         ses$upper[,1], ses$upper[,2], ses$upper[,3],ses$upper[,4]))
+  
+  print(cat(i,"ses"))
+  average_ses_3 = c(pinball_loss(rep(0.005,28),data_train3[,i],head(data_test3[,i],28),ses$ses.lower...4.,28),
+                          pinball_loss(rep(0.025,28),data_train3[,i],head(data_test3[,i],28),ses$ses.lower...3.,28),
+                          pinball_loss(rep(0.165,28),data_train3[,i],head(data_test3[,i],28),ses$ses.lower...2.,28),
+                          pinball_loss(rep(0.25,28),data_train3[,i],head(data_test3[,i],28),ses$ses.lower...1.,28),
+                          pinball_loss(rep(0.75,28),data_train3[,i],head(data_test3[,i],28),ses$ses.mean,28),
+                          pinball_loss(rep(0.835,28),data_train3[,i],head(data_test3[,i],28),ses$ses.upper...1.,28),
+                          pinball_loss(rep(0.975,28),data_train3[,i],head(data_test3[,i],28),ses$ses.upper...2.,28),
+                          pinball_loss(rep(0.995,28),data_train3[,i],head(data_test3[,i],28),ses$ses.upper...3.,28),
+                          pinball_loss(rep(0.995,28),data_train3[,i],head(data_test3[,i],28),ses$ses.upper...4.,28))
+  print(average_ses_3)
+  
+  
+  #NAIVE
+  naive = naive(data_train3[,i], h = 28, level = c(50, 67, 95, 99))
+  naive = data.frame(cbind(naive$lower[,4], naive$lower[,3], naive$lower[,2], naive$lower[,1],
+                           naive$mean,
+                           naive$upper[,1], naive$upper[,2], naive$upper[,3], naive$upper[,4]))
+  print(cat(i,"naive"))
+  
+  average_naive_3 = c(pinball_loss(rep(0.005,28),data_train3[,i],head(data_test3[,i],28),naive$naive.lower...4.,28),
+                            pinball_loss(rep(0.025,28),data_train3[,i],head(data_test3[,i],28),naive$naive.lower...3.,28),
+                            pinball_loss(rep(0.165,28),data_train3[,i],head(data_test3[,i],28),naive$naive.lower...2.,28),
+                            pinball_loss(rep(0.25,28),data_train3[,i],head(data_test3[,i],28),naive$naive.lower...1.,28),
+                            pinball_loss(rep(0.75,28),data_train3[,i],head(data_test3[,i],28),naive$naive.mean,28),
+                            pinball_loss(rep(0.835,28),data_train3[,i],head(data_test3[,i],28),naive$naive.upper...1.,28),
+                            pinball_loss(rep(0.975,28),data_train3[,i],head(data_test3[,i],28),naive$naive.upper...2.,28),
+                            pinball_loss(rep(0.995,28),data_train3[,i],head(data_test3[,i],28),naive$naive.upper...3.,28),
+                            pinball_loss(rep(0.995,28),data_train3[,i],head(data_test3[,i],28),naive$naive.upper...4.,28))
+  
+  print(average_naive_3)
+  
+  
+  #sNaive
+  snaive = snaive(data_train3[,i], h = 28, level = c(50, 67, 95, 99))
+  snaive = data.frame(cbind(snaive$lower[,4], snaive$lower[,3], snaive$lower[,2], snaive$lower[,1],
+                            snaive$mean,
+                            snaive$upper[,1], snaive$upper[,2], snaive$upper[,3], snaive$upper[,4]))
+  
+  print(cat(i,"snaive"))
+  average_snaive_3 = c(pinball_loss(rep(0.005,28),data_train3[,i],head(data_test3[,i],28),snaive$snaive.lower...4.,28),
+                             pinball_loss(rep(0.025,28),data_train3[,i],head(data_test3[,i],28),snaive$snaive.lower...3.,28),
+                             pinball_loss(rep(0.165,28),data_train3[,i],head(data_test3[,i],28),snaive$snaive.lower...2.,28),
+                             pinball_loss(rep(0.25,28),data_train3[,i],head(data_test3[,i],28),snaive$snaive.lower...1.,28),
+                             pinball_loss(rep(0.75,28),data_train3[,i],head(data_test3[,i],28),snaive$snaive.mean,28),
+                             pinball_loss(rep(0.835,28),data_train3[,i],head(data_test3[,i],28),snaive$snaive.upper...1.,28),
+                             pinball_loss(rep(0.975,28),data_train3[,i],head(data_test3[,i],28),snaive$snaive.upper...2.,28),
+                             pinball_loss(rep(0.995,28),data_train3[,i],head(data_test3[,i],28),snaive$snaive.upper...3.,28),
+                             pinball_loss(rep(0.995,28),data_train3[,i],head(data_test3[,i],28),snaive$snaive.upper...4.,28))
+  
+  print(average_snaive_3)
+  
+  #Exponential Smoothing (Bottom up approach)
+  etsb = forecast(ets(data_train3[,i]), method="bu", fmethod="arima",h=28,level = c(50, 67, 95, 99))
+  etsb = data.frame(cbind(etsb$lower[,4], etsb$lower[,3], etsb$lower[,2], etsb$lower[,1],
+                          etsb$mean,
+                          etsb$upper[,1], etsb$upper[,2], etsb$upper[,3], etsb$upper[,4]))
+  print(cat(i,"Exp Smoothing"))
+  average_etsb_3 = c(pinball_loss(rep(0.005,28),data_train3[,i],head(data_test3[,i],28),etsb$etsb.lower...4.,28),
+                           pinball_loss(rep(0.025,28),data_train3[,i],head(data_test3[,i],28),etsb$etsb.lower...3.,28),
+                           pinball_loss(rep(0.165,28),data_train3[,i],head(data_test3[,i],28),etsb$etsb.lower...2.,28),
+                           pinball_loss(rep(0.25,28),data_train3[,i],head(data_test3[,i],28),etsb$etsb.lower...1.,28),
+                           pinball_loss(rep(0.75,28),data_train3[,i],head(data_test3[,i],28),etsb$etsb.mean,28),
+                           pinball_loss(rep(0.835,28),data_train3[,i],head(data_test3[,i],28),etsb$etsb.upper...1.,28),
+                           pinball_loss(rep(0.975,28),data_train3[,i],head(data_test3[,i],28),etsb$etsb.upper...2.,28),
+                           pinball_loss(rep(0.995,28),data_train3[,i],head(data_test3[,i],28),etsb$etsb.upper...3.,28),
+                           pinball_loss(rep(0.995,28),data_train3[,i],head(data_test3[,i],28),etsb$etsb.upper...4.,28))
+  print(average_etsb_3)
+  
+  
+  #AutoRegressive Integrated Moving Average (ARIMA)
+  arima = forecast(auto.arima(data_train3[,i]), h = 28, level = c(50, 67, 95, 99))
+  arima = data.frame(cbind(arima$lower[,4], arima$lower[,3], arima$lower[,2], arima$lower[,1],
+                           arima$mean,
+                           arima$upper[,1], arima$upper[,2], arima$upper[,3], arima$upper[,4]))
+  print(cat(i,"ARIMA"))
+  average_arima_3 = c(pinball_loss(rep(0.005,28),data_train3[,i],head(data_test3[,i],28),arima$arima.lower...4.,28),
+                            pinball_loss(rep(0.025,28),data_train3[,i],head(data_test3[,i],28),arima$arima.lower...3.,28),
+                            pinball_loss(rep(0.165,28),data_train3[,i],head(data_test3[,i],28),arima$arima.lower...2.,28),
+                            pinball_loss(rep(0.25,28),data_train3[,i],head(data_test3[,i],28),arima$arima.lower...1.,28),
+                            pinball_loss(rep(0.75,28),data_train3[,i],head(data_test3[,i],28),arima$arima.mean,28),
+                            pinball_loss(rep(0.835,28),data_train3[,i],head(data_test3[,i],28),arima$arima.upper...1.,28),
+                            pinball_loss(rep(0.975,28),data_train3[,i],head(data_test3[,i],28),arima$arima.upper...2.,28),
+                            pinball_loss(rep(0.995,28),data_train3[,i],head(data_test3[,i],28),arima$arima.upper...3.,28),
+                            pinball_loss(rep(0.995,28),data_train3[,i],head(data_test3[,i],28),arima$arima.upper...4.,28))
+  
+  print(average_arima_3)
+  
+  #Kernel Density Function
+  quants = as.numeric(quantile(data_train3[,i],c(0.005, 0.025, 0.165, 0.25, 0.5, 0.75, 0.835, 0.975, 0.995)))
+  kernel = data.frame(cbind(rep(quants[1],28), rep(quants[2],28), rep(quants[3],28),
+                            rep(quants[4],28), rep(quants[5],28), rep(quants[6],28),
+                            rep(quants[7],28), rep(quants[8],28), rep(quants[9],28)))
+  print(cat(i,"Kernel"))
+  
+  average_kernel_3 = c(pinball_loss(rep(0.005,28),data_train3[,i],head(data_test3[,i],28),kernel$X1,28),
+                             pinball_loss(rep(0.025,28),data_train3[,i],head(data_test3[,i],28),kernel$X2,28),
+                             pinball_loss(rep(0.165,28),data_train3[,i],head(data_test3[,i],28),kernel$X3,28),
+                             pinball_loss(rep(0.25,28),data_train3[,i],head(data_test3[,i],28),kernel$X4,28),
+                             pinball_loss(rep(0.75,28),data_train3[,i],head(data_test3[,i],28),kernel$X5,28),
+                             pinball_loss(rep(0.835,28),data_train3[,i],head(data_test3[,i],28),kernel$X6,28),
+                             pinball_loss(rep(0.975,28),data_train3[,i],head(data_test3[,i],28),kernel$X7,28),
+                             pinball_loss(rep(0.995,28),data_train3[,i],head(data_test3[,i],28),kernel$X8,28),
+                             pinball_loss(rep(0.995,28),data_train3[,i],head(data_test3[,i],28),kernel$X8,28))
+  
+  print(average_kernel_3)
+  
+}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

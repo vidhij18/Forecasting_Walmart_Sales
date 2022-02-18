@@ -1,0 +1,43 @@
+---
+title: "Conclusions"
+output: html_document
+---
+
+# Conclusions
+
+This project aims at forecasting sales of some products/items at three Walmart stores in California. The data consists of 6 different item categories (items related to hobbies, two household categories and three food categories), in three Walmart Stores labelled CA_1, CA_2 and CA_3. The data is at the daily frequency. We perform some preliminary analysis on the data regarding its stationarity and then try fitting many models and make future point and probabilistic forecasts. We consider 3 different training-testing splits in the data and present the average results. After working with univariate models such as Naive, sNaive, ES, MA, ESX, SARIMA, SARIMAX and Holt-Winters, we move to multivariate VAR models. At the end we discuss some advanced machine learning and deep learning models.
+ 
+-	Assessing the data via ACF Plots and various tests gave us the conclusion that none of the series was stationary. Seasonality is very evident from all the graphs. 
+ 
+-	We compared the probabilistic forecast methods, multivariate VARs, Prophet using the Pinball loss. For point forecast methods, we computed RMSSE along with LSTM.
+
+-	We saw that the classical approaches performed better for these models. The table shows the best performing model for each of the time series
+
+-The performance of the VAR models on individual time series is much better than the performance on the Item level aggregates. The Store level aggregate perform the best.
+
+- Apart from this, we only used classical LSTM model, it was observed that the outputs were comparable with hyper parameter tuned FB Prophet model, suggesting possible optimal architecture of LSTM (with multiple LSTM layers) could prove to be one of the efficient models in forecasting. 
+
+```{r Making conclusion table}
+best_models = data.frame(matrix(nrow = 18, ncol = 2, dimnames = list((1:18),cbind("Time_series", "Model"))))
+best_models[1,] = cbind("Hobbies_CA_1", "ARIMA")
+best_models[2,] = cbind("Household_1_CA_1", "SES")
+best_models[3,] = cbind("Household_2_CA_1", "Exponential Smoothing (Bottom up)")
+best_models[4,] = cbind("Foods_1_CA_1", "Kernel")
+best_models[5,] = cbind("Foods_2_CA_1", "Kernel")
+best_models[6,] = cbind("Foods_3_CA_1", "Kernel")
+
+best_models[7,] = cbind("Hobbies_CA_2", "Kernel")
+best_models[8,] = cbind("Household_1_CA_2", "Kernel")
+best_models[9,] = cbind("Household_2_CA_2", "Kernel")
+best_models[10,] = cbind("Foods_1_CA_2", "Kernel")
+best_models[11,] = cbind("Foods_2_CA_2", "Kernel")
+best_models[12,] = cbind("Foods_3_CA_2", "Kernel")
+
+best_models[13,] = cbind("Hobbies_CA_3", "SES")
+best_models[14,] = cbind("Household_1_CA_3", "Exponential Smoothing (Bottom up)")
+best_models[15,] = cbind("Household_2_CA_3", "Kernel")
+best_models[16,] = cbind("Foods_1_CA_3", "sNaive")
+best_models[17,] = cbind("Foods_2_CA_3", "Kernel")
+best_models[18,] = cbind("Foods_3_CA_3", "Kernel")
+best_models
+```
